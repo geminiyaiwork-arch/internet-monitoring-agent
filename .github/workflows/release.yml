@@ -45,12 +45,19 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path dist/windows | Out-Null
-          Get-ChildItem -Path . -Recurse -Filter *.msix -ErrorAction SilentlyContinue | Copy-Item -Destination dist/windows
-          Get-ChildItem -Path build/installer -Recurse -Filter *.exe -ErrorAction SilentlyContinue | Copy-Item -Destination dist/windows
+          $msix = Get-ChildItem -Path . -Recurse -Filter *.msix -ErrorAction SilentlyContinue
+          foreach ($f in $msix) { Copy-Item $f.FullName -Destination dist/windows -Force }
+          if (Test-Path build/installer) {
+            $exe = Get-ChildItem -Path build/installer -Recurse -Filter *.exe -ErrorAction SilentlyContinue
+            foreach ($f in $exe) { Copy-Item $f.FullName -Destination dist/windows -Force }
+          }
+          Write-Host "Collected:"
+          Get-ChildItem -Path dist/windows | ForEach-Object { Write-Host "  $($_.Name) ($($_.Length) bytes)" }
       - uses: actions/upload-artifact@v4
         with:
           name: windows-installers
           path: dist/windows/*
+          if-no-files-found: error
 
   build-macos:
     runs-on: macos-latest
