@@ -1,0 +1,13 @@
+[Unit]
+Description=Internet Monitoring Agent
+After=network-online.target graphical-session.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/opt/internet-monitoring-agent/internet --startup-tray
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target

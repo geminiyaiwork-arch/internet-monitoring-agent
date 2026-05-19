@@ -1,0 +1,70 @@
+name: Build Linux
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - '**.md'
+      - 'installer/macos/**'
+      - 'windows/installer/**'
+  workflow_call:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: System dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ninja-build clang cmake pkg-config \
+            libgtk-3-dev libsecret-1-dev libjsoncpp-dev \
+            libayatana-appindicator3-dev \
+            rpm dpkg-dev fakeroot
+
+      - name: Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Pub get
+        run: flutter pub get
+
+      - name: Build Linux release
+        run: flutter build linux --release
+
+      - name: Build .deb
+        run: bash installer/linux/deb/build_deb.sh
+
+      - name: Build .rpm
+        run: bash installer/linux/rpm/build_rpm.sh
+
+      - name: Install appimagetool
+        run: |
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x appimagetool-x86_64.AppImage
+          sudo mv appimagetool-x86_64.AppImage /usr/local/bin/appimagetool
+
+      - name: Build AppImage
+        run: |
+          # AppImage GitHub Actions ichida FUSE'siz: --appimage-extract-and-run mode
+          APPIMAGE_EXTRACT_AND_RUN=1 bash installer/linux/appimage/build_appimage.sh
+
+      - name: Build tar.gz
+        run: bash installer/linux/build_tarball.sh
+
+      - name: Upload Linux installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-installers
+          path: |
+            build/installer/*.deb
+            build/installer/*.rpm
+            build/installer/*.AppImage
+            build/installer/*.tar.gz
+          if-no-files-found: error

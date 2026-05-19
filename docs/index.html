@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Internet Monitoring Agent — Yuklab olish</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(135deg, #0D47A1 0%, #1565C0 100%);
+    color: #fff; margin: 0; min-height: 100vh;
+    display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .wrap { max-width: 980px; width: 100%; }
+  header { text-align: center; margin-bottom: 32px; }
+  h1 { font-size: 36px; margin: 0 0 8px; font-weight: 700; }
+  .sub { opacity: 0.85; font-size: 17px; }
+  .badge { display: inline-block; padding: 4px 10px; background: rgba(255,255,255,0.18);
+           border-radius: 999px; font-size: 12px; margin-top: 12px; }
+  .grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+  .card {
+    background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.18);
+    backdrop-filter: blur(8px); border-radius: 14px; padding: 24px;
+  }
+  .card h2 { margin: 0 0 6px; font-size: 22px; display: flex; align-items: center; gap: 10px; }
+  .card p { opacity: 0.85; font-size: 14px; margin: 0 0 16px; }
+  .btn { display: block; padding: 12px 16px; border-radius: 10px; text-decoration: none;
+         color: #0D47A1; background: #fff; font-weight: 600; margin-bottom: 8px;
+         transition: transform .12s, box-shadow .12s; text-align: left; }
+  .btn small { display: block; font-weight: 400; font-size: 12px; opacity: 0.7; margin-top: 2px; }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
+  .btn.ghost { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,0.4); }
+  footer { text-align: center; opacity: 0.7; font-size: 13px; margin-top: 36px; }
+  footer a { color: #fff; }
+  code { background: rgba(0,0,0,0.25); padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Internet Monitoring Agent</h1>
+    <div class="sub">Ta'lim muassasalari uchun ruxsatli kuzatuv agenti</div>
+    <span class="badge">Windows · macOS · Linux</span>
+  </header>
+
+  <div class="grid">
+    <!-- WINDOWS -->
+    <div class="card">
+      <h2>🪟 Windows</h2>
+      <p>Windows 10/11 (x64). Asosiy ishlatish platformasi.</p>
+      <a class="btn" id="win-exe" href="#">⬇ Setup .exe (Inno)<small>Klassik installer</small></a>
+      <a class="btn ghost" id="win-msix" href="#">⬇ Package .msix<small>Microsoft Store paketi</small></a>
+    </div>
+
+    <!-- macOS -->
+    <div class="card">
+      <h2>🍎 macOS</h2>
+      <p>macOS 11+ (Apple Silicon va Intel).</p>
+      <a class="btn" id="mac-dmg" href="#">⬇ Image .dmg<small>Drag-and-drop o'rnatish</small></a>
+      <a class="btn ghost" id="mac-pkg" href="#">⬇ Installer .pkg<small>LaunchAgent bilan</small></a>
+    </div>
+
+    <!-- LINUX -->
+    <div class="card">
+      <h2>🐧 Linux</h2>
+      <p>x64 distrolar uchun bir nechta format.</p>
+      <a class="btn" id="lin-deb" href="#">⬇ .deb<small>Debian / Ubuntu</small></a>
+      <a class="btn ghost" id="lin-rpm" href="#">⬇ .rpm<small>Fedora / RHEL</small></a>
+      <a class="btn ghost" id="lin-appimage" href="#">⬇ .AppImage<small>Har qanday distro (portable)</small></a>
+      <a class="btn ghost" id="lin-tar" href="#">⬇ .tar.gz<small>Manual o'rnatish</small></a>
+    </div>
+  </div>
+
+  <footer>
+    Birinchi marta ochilganda <code>X-Agent-Key</code> kerak — admin paneldan oling:
+    <a href="https://e-mmtb.uz">e-mmtb.uz</a><br>
+    <span id="version-info">Versiya yuklanmoqda…</span>
+  </footer>
+</div>
+
+<script>
+  // GitHub Releases API'dan oxirgi versiyani topib link'larni to'ldiradi.
+  // OWNER/REPO'ni o'zingiznikiga moslang (yoki <script> ichida hard-code qiling).
+  const OWNER = "geminiyaiwork-arch";
+  const REPO = "internet-monitoring-agent";
+
+  async function loadLatest() {
+    try {
+      const r = await fetch(`https://api.github.com/repos/${OWNER}/${REPO}/releases/latest`);
+      if (!r.ok) throw new Error('GitHub API ' + r.status);
+      const j = await r.json();
+      const map = {
+        'win-exe':      /Setup.*\.exe$/i,
+        'win-msix':     /\.msix$/i,
+        'mac-dmg':      /\.dmg$/i,
+        'mac-pkg':      /\.pkg$/i,
+        'lin-deb':      /\.deb$/i,
+        'lin-rpm':      /\.rpm$/i,
+        'lin-appimage': /\.AppImage$/i,
+        'lin-tar':      /\.tar\.gz$/i,
+      };
+      for (const [id, re] of Object.entries(map)) {
+        const asset = j.assets.find(a => re.test(a.name));
+        const el = document.getElementById(id);
+        if (asset && el) {
+          el.href = asset.browser_download_url;
+        } else if (el) {
+          el.style.opacity = 0.4;
+          el.removeAttribute('href');
+          el.title = 'Bu format hali yuklanmagan';
+        }
+      }
+      document.getElementById('version-info').textContent =
+        `Oxirgi versiya: ${j.tag_name} (${new Date(j.published_at).toLocaleDateString('uz-UZ')})`;
+    } catch (e) {
+      document.getElementById('version-info').textContent =
+        "GitHub Releases hali bo'sh — workflow ishga tushgandan keyin shu yerda paydo bo'ladi.";
+    }
+  }
+  loadLatest();
+</script>
+</body>
+</html>

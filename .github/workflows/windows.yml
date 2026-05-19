@@ -1,0 +1,74 @@
+name: Build Windows
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - '**.md'
+      - 'installer/macos/**'
+      - 'installer/linux/**'
+  workflow_call:
+    outputs:
+      msix_path:
+        value: ${{ jobs.build.outputs.msix_path }}
+      exe_path:
+        value: ${{ jobs.build.outputs.exe_path }}
+
+jobs:
+  build:
+    runs-on: windows-latest
+    outputs:
+      msix_path: ${{ steps.find.outputs.msix }}
+      exe_path: ${{ steps.find.outputs.exe }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Pub get
+        run: flutter pub get
+
+      - name: Build Windows release
+        run: flutter build windows --release
+
+      - name: Pack MSIX
+        run: dart run msix:create
+
+      - name: Inno Setup .exe installer
+        shell: pwsh
+        run: |
+          # Inno Setup compiler is preinstalled on windows-latest at: C:\Program Files (x86)\Inno Setup 6\ISCC.exe
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (Test-Path $iscc) {
+            & "$iscc" "windows\installer\internet_agent.iss"
+          } else {
+            choco install innosetup -y
+            & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "windows\installer\internet_agent.iss"
+          }
+
+      - name: Find artifacts
+        id: find
+        shell: pwsh
+        run: |
+          $msix = Get-ChildItem -Path . -Recurse -Filter *.msix -ErrorAction SilentlyContinue | Select-Object -First 1
+          $exe  = Get-ChildItem -Path build/installer -Recurse -Filter *.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+          "msix=$($msix.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "exe=$($exe.FullName)"   | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "MSIX: $($msix.FullName)"
+          Write-Host "EXE:  $($exe.FullName)"
+
+      - name: Upload Windows installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installers
+          path: |
+            build/**/*.msix
+            build/installer/*.exe
+            *.msix
+          if-no-files-found: error
