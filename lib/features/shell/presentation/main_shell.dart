@@ -43,7 +43,26 @@ class _MainShellState extends ConsumerState<MainShell> {
       });
     }
     try {
-      await ref.read(agentSchedulerProvider).syncNow();
+      // Heartbeat ni alohida chaqirib, javobni tekshiramiz.
+      final env = await ref.read(heartbeatRepositoryProvider).sendHeartbeat();
+      if (!env.success) {
+        if (env.sessionRevoked) {
+          if (mounted) {
+            setState(() => _status = 'Xato: Kalit bekor qilingan, qayta kiriting');
+          }
+          // 2s ko'rsatib, login sahifaga qaytarish.
+          await Future.delayed(const Duration(seconds: 2));
+          await ref.read(authSessionProvider.notifier).refresh();
+          return;
+        }
+        if (mounted) {
+          final msg = env.message ?? 'Noma\'lum xato';
+          setState(() => _status = 'Xato: ${msg.length > 80 ? msg.substring(0, 80) : msg}');
+        }
+        return;
+      }
+      // Heartbeat ishladi — qolganlarini fonda yuborish.
+      ref.read(agentSchedulerProvider).syncNow();
       if (mounted) {
         setState(() {
           _lastSync = DateTime.now();
@@ -53,7 +72,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     } catch (e) {
       final msg = e.toString();
       if (mounted) {
-        setState(() => _status = 'Xato: ${msg.length > 60 ? msg.substring(0, 60) : msg}');
+        setState(() => _status = 'Xato: ${msg.length > 80 ? msg.substring(0, 80) : msg}');
       }
     } finally {
       if (mounted) setState(() => _syncing = false);

@@ -61,20 +61,38 @@ class ApiClient {
       data: body,
       options: options,
     );
-    final data = res.data;
-    if (data == null) {
-      return ApiEnvelope(success: false, message: 'Empty body', raw: null);
-    }
-    return ApiEnvelope.fromJson(data);
+    return _wrap(res);
   }
 
   Future<ApiEnvelope> getJson(String path) async {
     final res = await _dio.get<Map<String, dynamic>>(path);
+    return _wrap(res);
+  }
+
+  /// 401/403 ni avtomatik sessionRevoked deb belgilash.
+  ApiEnvelope _wrap(Response<Map<String, dynamic>> res) {
     final data = res.data;
+    final isAuth = res.statusCode == 401 || res.statusCode == 403;
     if (data == null) {
-      return ApiEnvelope(success: false, message: 'Empty body', raw: null);
+      return ApiEnvelope(
+        success: false,
+        message: 'Empty body',
+        sessionRevoked: isAuth,
+        raw: null,
+      );
     }
-    return ApiEnvelope.fromJson(data);
+    final env = ApiEnvelope.fromJson(data);
+    if (isAuth && !env.sessionRevoked) {
+      return ApiEnvelope(
+        success: false,
+        message: env.message ?? 'Auth error',
+        sessionRevoked: true,
+        data: env.data,
+        errors: env.errors,
+        raw: data,
+      );
+    }
+    return env;
   }
 
   Dio get dio => _dio;
