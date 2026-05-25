@@ -30,12 +30,13 @@ mkdir -p "$DEB_ROOT/opt/internet-monitoring-agent"
 mkdir -p "$DEB_ROOT/usr/share/applications"
 mkdir -p "$DEB_ROOT/usr/share/icons/hicolor/256x256/apps"
 mkdir -p "$DEB_ROOT/usr/lib/systemd/user"
+mkdir -p "$DEB_ROOT/etc/xdg/autostart"
 
 cp -r "$BUILD_OUT"/* "$DEB_ROOT/opt/internet-monitoring-agent/"
 cp "$ROOT/installer/linux/systemd/internet-agent.service" \
    "$DEB_ROOT/usr/lib/systemd/user/internet-agent.service"
 
-# .desktop fayl
+# .desktop fayl (menyu uchun)
 cat > "$DEB_ROOT/usr/share/applications/internet-monitoring-agent.desktop" <<EOF
 [Desktop Entry]
 Name=Internet Monitoring Agent
@@ -45,6 +46,19 @@ Icon=internet-monitoring-agent
 Terminal=false
 Type=Application
 Categories=Network;Utility;
+StartupWMClass=internet
+EOF
+
+# Auto-start har gal kompyuter yonganda (XDG autostart, har qaysi DE qo'llaydi).
+cat > "$DEB_ROOT/etc/xdg/autostart/internet-monitoring-agent.desktop" <<EOF
+[Desktop Entry]
+Name=Internet Monitoring Agent
+Comment=Authorized education monitoring agent (autostart)
+Exec=/opt/internet-monitoring-agent/internet --startup-tray
+Icon=internet-monitoring-agent
+Terminal=false
+Type=Application
+X-GNOME-Autostart-enabled=true
 StartupWMClass=internet
 EOF
 

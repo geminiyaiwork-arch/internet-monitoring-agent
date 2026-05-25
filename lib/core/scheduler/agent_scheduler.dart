@@ -151,6 +151,9 @@ class AgentScheduler {
         await _logger.log(LogLevel.info, 'Server buyrug\'i: ${cmd.type}');
         switch (cmd.type) {
           case 'sync_now':
+          case 'resend_all':
+            await syncNow();
+            break;
           case 'heartbeat':
             await _doHeartbeat();
             await _doProcesses();
@@ -203,12 +206,18 @@ class AgentScheduler {
     }
   }
 
+  /// Hozir hamma narsani yuborish: heartbeat + processes + inventory + speed test.
+  /// Login bo'lgan zahoti yoki admin "resend_all" buyrug'i bersa chaqiriladi.
   Future<void> syncNow() async {
     if (!await _auth.isLoggedIn()) return;
     await _flushQueue();
     await _doHeartbeat();
+    _lastHeartbeatAt = DateTime.now().toUtc();
     await _doProcesses();
+    _lastProcessesAt = DateTime.now().toUtc();
     await _inventory.sync(manual: true);
+    await _doSpeedTest();
+    _lastSpeedTestAt = DateTime.now().toUtc();
   }
 
   void dispose() => stop();

@@ -59,25 +59,6 @@ jobs:
           path: dist/windows/*
           if-no-files-found: error
 
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - run: flutter pub get
-      - run: flutter build macos --release
-      - run: bash installer/macos/build_dmg.sh
-      - run: bash installer/macos/build_pkg.sh
-      - uses: actions/upload-artifact@v4
-        with:
-          name: macos-installers
-          path: |
-            build/installer/*.dmg
-            build/installer/*.pkg
-
   build-linux:
     runs-on: ubuntu-22.04
     steps:
@@ -114,7 +95,7 @@ jobs:
             build/installer/*.tar.gz
 
   publish:
-    needs: [build-windows, build-macos, build-linux]
+    needs: [build-windows, build-linux]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -159,10 +140,6 @@ jobs:
             ### Windows
             - `InternetMonitoringAgent_Setup_*.exe` — klassik installer (Inno Setup)
             - `internet.msix` — Microsoft Store paketi
-
-            ### macOS
-            - `InternetMonitoringAgent-*.dmg` — drag-and-drop o'rnatish
-            - `InternetMonitoringAgent-*.pkg` — LaunchAgent bilan avtomatik o'rnatish
 
             ### Linux
             - `internet-monitoring-agent_*.deb` — Debian/Ubuntu (`sudo dpkg -i`)

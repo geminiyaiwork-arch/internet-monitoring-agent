@@ -1,5 +1,5 @@
 name: internet
-description: Internet Monitoring Agent — ruxsatli ta'lim monitoring agenti (Windows, macOS, Linux).
+description: Internet Monitoring Agent — ruxsatli ta'lim monitoring agenti (Windows, Linux).
 publish_to: 'none'
 
 version: 1.0.0+1

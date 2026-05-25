@@ -1,7 +1,4 @@
-import 'dart:convert';
 import 'dart:io';
-
-import 'package:path/path.dart' as p;
 
 import 'models/inventory_models.dart';
 
@@ -11,7 +8,6 @@ abstract class InventoryScanner {
 
 InventoryScanner createInventoryScanner() {
   if (Platform.isWindows) return WindowsInventoryScanner();
-  if (Platform.isMacOS) return MacOsInventoryScanner();
   if (Platform.isLinux) return LinuxInventoryScanner();
   return _EmptyScanner();
 }
@@ -90,84 +86,6 @@ class WindowsInventoryScanner implements InventoryScanner {
     final m = RegExp(r'REG_(?:SZ|EXPAND_SZ|DWORD)\s+(.*)').firstMatch(line);
     final v = m?.group(1)?.trim();
     return (v == null || v.isEmpty) ? null : v;
-  }
-}
-
-// =================== macOS ===================
-class MacOsInventoryScanner implements InventoryScanner {
-  @override
-  Future<List<InstalledAppDto>> scan() async {
-    final map = <String, InstalledAppDto>{};
-
-    // 1) /Applications va ~/Applications papkalaridagi .app
-    for (final root in ['/Applications', '${Platform.environment['HOME']}/Applications']) {
-      final dir = Directory(root);
-      if (!dir.existsSync()) continue;
-      for (final entity in dir.listSync(followLinks: false)) {
-        if (entity is Directory && entity.path.endsWith('.app')) {
-          final infoPlist = File(p.join(entity.path, 'Contents', 'Info.plist'));
-          String? version;
-          String? bundleId;
-          if (infoPlist.existsSync()) {
-            try {
-              final res = await Process.run('defaults', [
-                'read',
-                p.join(entity.path, 'Contents', 'Info'),
-                'CFBundleShortVersionString',
-              ]);
-              if (res.exitCode == 0) version = res.stdout.toString().trim();
-            } catch (_) {}
-            try {
-              final res = await Process.run('defaults', [
-                'read',
-                p.join(entity.path, 'Contents', 'Info'),
-                'CFBundleIdentifier',
-              ]);
-              if (res.exitCode == 0) bundleId = res.stdout.toString().trim();
-            } catch (_) {}
-          }
-          final dto = InstalledAppDto(
-            displayName: p.basenameWithoutExtension(entity.path),
-            displayVersion: version,
-            publisher: bundleId,
-            installPath: entity.path,
-            source: 'applications',
-          );
-          map[dto.computeHash()] = dto;
-        }
-      }
-    }
-
-    // 2) system_profiler SPApplicationsDataType (qo'shimcha)
-    try {
-      final res = await Process.run('system_profiler', [
-        'SPApplicationsDataType',
-        '-json',
-        '-detailLevel',
-        'mini',
-      ]).timeout(const Duration(seconds: 30));
-      if (res.exitCode == 0) {
-        final decoded = json.decode(res.stdout.toString());
-        final items = (decoded['SPApplicationsDataType'] as List?) ?? const [];
-        for (final raw in items) {
-          if (raw is! Map) continue;
-          final name = raw['_name']?.toString();
-          if (name == null || name.isEmpty) continue;
-          final dto = InstalledAppDto(
-            displayName: name,
-            displayVersion: raw['version']?.toString(),
-            publisher: raw['obtained_from']?.toString(),
-            installDate: raw['lastModified']?.toString(),
-            installPath: raw['path']?.toString(),
-            source: 'system_profiler',
-          );
-          map[dto.computeHash()] = dto;
-        }
-      }
-    } catch (_) {}
-
-    return map.values.toList()
-      ..sort((a, b) => a.displayName.compareTo(b.displayName));
   }
 }
 

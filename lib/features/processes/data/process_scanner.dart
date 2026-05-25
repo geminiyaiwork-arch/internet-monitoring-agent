@@ -9,7 +9,6 @@ abstract class ProcessScanner {
 
 ProcessScanner createProcessScanner() {
   if (Platform.isWindows) return WindowsProcessScanner();
-  if (Platform.isMacOS) return UnixProcessScanner(macos: true);
   if (Platform.isLinux) return LinuxProcProcessScanner();
   return _EmptyScanner();
 }
@@ -64,55 +63,6 @@ Get-CimInstance Win32_Process | ForEach-Object {
           commandLine: m['cmdline']?.toString(),
         );
       }).where((p) => p.pid > 0 && p.name.isNotEmpty).toList();
-    } catch (_) {
-      return const [];
-    }
-  }
-}
-
-// =================== macOS: ps ===================
-class UnixProcessScanner implements ProcessScanner {
-  UnixProcessScanner({this.macos = false});
-
-  final bool macos;
-
-  @override
-  Future<List<ProcessInfoDto>> scan() async {
-    try {
-      final res = await Process.run('ps', [
-        '-Ao',
-        'pid=,comm=,%cpu=,rss=,lstart=,user=,args=',
-      ]).timeout(const Duration(seconds: 15));
-      if (res.exitCode != 0) return const [];
-      final lines = res.stdout.toString().split('\n');
-      final result = <ProcessInfoDto>[];
-      for (final line in lines) {
-        final t = line.trim();
-        if (t.isEmpty) continue;
-        // lstart has spaces: "Mon Apr 23 10:00:00 2026"
-        // Split first 4 fields manually, the rest is lstart(5w) + user(1w) + args(rest).
-        final parts = t.split(RegExp(r'\s+'));
-        if (parts.length < 11) continue;
-        final pid = int.tryParse(parts[0]) ?? 0;
-        final name = parts[1];
-        final cpu = double.tryParse(parts[2]);
-        final rssKb = int.tryParse(parts[3]);
-        final lstart = parts.sublist(4, 9).join(' ');
-        final user = parts[9];
-        final args = parts.sublist(10).join(' ');
-        if (pid <= 0 || name.isEmpty) continue;
-        result.add(ProcessInfoDto(
-          pid: pid,
-          name: name,
-          executablePath: args.startsWith('/') ? args.split(' ').first : null,
-          cpuPercent: cpu,
-          memoryMb: rssKb == null ? null : (rssKb / 1024).round(),
-          startedAt: lstart,
-          user: user,
-          commandLine: args,
-        ));
-      }
-      return result;
     } catch (_) {
       return const [];
     }

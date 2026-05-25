@@ -3,7 +3,6 @@ import 'package:uuid/uuid.dart';
 
 /// Maxfiy saqlash:
 /// - Windows: DPAPI
-/// - macOS:   Keychain
 /// - Linux:   libsecret (gnome-keyring)
 class SecureVault {
   final FlutterSecureStorage _storage = const FlutterSecureStorage(

@@ -9,7 +9,7 @@ import 'package:path_provider/path_provider.dart';
 /// Returns false agar boshqa instance allaqachon ishlayotgan bo'lsa.
 Future<bool> acquireSingleInstanceLock() async {
   if (Platform.isWindows) return _windowsLock();
-  if (Platform.isMacOS || Platform.isLinux) return _unixLock();
+  if (Platform.isLinux) return _unixLock();
   return true;
 }
 
@@ -44,7 +44,7 @@ bool _windowsLock() {
   }
 }
 
-// === macOS / Linux: file lock ===
+// === Linux: file lock ===
 Future<bool> _unixLock() async {
   try {
     final dir = await getApplicationSupportDirectory();

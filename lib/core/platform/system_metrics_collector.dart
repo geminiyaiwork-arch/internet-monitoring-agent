@@ -5,7 +5,6 @@ import 'package:dio/dio.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 
 import 'metrics/linux_metrics.dart';
-import 'metrics/macos_metrics.dart';
 import 'metrics/windows_metrics.dart';
 
 class ResourceSnapshot {
@@ -81,14 +80,12 @@ class SystemMetricsCollector {
   /// Tizim ishlagan vaqt (soniya).
   int uptimeSeconds() {
     if (Platform.isWindows) return WindowsMetrics.uptimeSeconds();
-    if (Platform.isMacOS) return MacOsMetrics.uptimeSeconds();
     if (Platform.isLinux) return LinuxMetrics.uptimeSeconds();
     return 0;
   }
 
   ResourceSnapshot readResources() {
     if (Platform.isWindows) return WindowsMetrics.snapshot();
-    if (Platform.isMacOS) return MacOsMetrics.snapshot();
     if (Platform.isLinux) return LinuxMetrics.snapshot();
     return ResourceSnapshot.empty;
   }

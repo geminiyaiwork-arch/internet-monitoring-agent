@@ -17,12 +17,6 @@ class DeviceIdentityService {
           await _vault.setDeviceFingerprint(id);
           return id;
         }
-      } else if (Platform.isMacOS) {
-        final id = _macIoPlatformUuid();
-        if (id != null && id.isNotEmpty) {
-          await _vault.setDeviceFingerprint(id);
-          return id;
-        }
       } else if (Platform.isLinux) {
         final id = _linuxMachineId();
         if (id != null && id.isNotEmpty) {
@@ -50,21 +44,6 @@ class DeviceIdentityService {
       final out = res.stdout.toString();
       final m = RegExp(r'MachineGuid\s+REG_SZ\s+([0-9a-fA-F-]+)')
           .firstMatch(out);
-      return m?.group(1);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /// macOS: IOPlatformUUID.
-  String? _macIoPlatformUuid() {
-    try {
-      final res = Process.runSync(
-        'ioreg',
-        ['-d2', '-c', 'IOPlatformExpertDevice'],
-      );
-      final out = res.stdout.toString();
-      final m = RegExp(r'"IOPlatformUUID"\s+=\s+"([^"]+)"').firstMatch(out);
       return m?.group(1);
     } catch (_) {
       return null;

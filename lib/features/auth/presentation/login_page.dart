@@ -38,8 +38,17 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       });
       return;
     }
+    // Kalit XXXX-XXXX-XXXX formatida bo'lsin.
+    final norm = key.toUpperCase();
+    if (!RegExp(r'^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$').hasMatch(norm)) {
+      setState(() {
+        _busy = false;
+        _error = 'Kalit noto‘g‘ri formatda. Masalan: XXXX-XXXX-XXXX';
+      });
+      return;
+    }
     final auth = ref.read(authRepositoryProvider);
-    final env = await auth.loginWithKey(key);
+    final env = await auth.loginWithKey(norm);
     if (!mounted) return;
     setState(() => _busy = false);
     if (env.success) {

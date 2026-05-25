@@ -19,11 +19,11 @@ class AppConfig {
   static const String logsPath = '/agent/logs';
   static const String commandsPath = '/agent/commands';
 
-  // === Default intervals ===
-  static const Duration defaultHeartbeatInterval = Duration(minutes: 5);
-  static const Duration defaultSpeedTestInterval = Duration(minutes: 30);
+  // === Default intervals (har 10 daqiqada hammasi yangilanadi) ===
+  static const Duration defaultHeartbeatInterval = Duration(minutes: 10);
+  static const Duration defaultSpeedTestInterval = Duration(minutes: 10);
   static const Duration defaultInventoryInterval = Duration(hours: 24);
-  static const Duration defaultProcessInterval = Duration(minutes: 5);
+  static const Duration defaultProcessInterval = Duration(minutes: 10);
   static const Duration defaultCommandsPollInterval = Duration(minutes: 1);
 
   /// Heartbeat va boshqa joylarda dispatch (15s ichida bir karra tick).
