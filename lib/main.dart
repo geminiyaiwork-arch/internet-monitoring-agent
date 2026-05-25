@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -25,38 +26,99 @@ import 'features/speed_test/data/speed_test_repository.dart';
 import 'shared/providers/providers.dart';
 
 Future<void> main(List<String> args) async {
-  WidgetsFlutterBinding.ensureInitialized();
-  final startHidden = args.contains('--startup-tray');
+  // Release build'da console yo'q — har qanday xato faylga yozilsin.
+  // %LOCALAPPDATA%\internet-monitoring-agent\startup.log (Win)
+  // ~/.local/share/internet-monitoring-agent/startup.log (Linux)
+  await _logStartup('=== main() boshlandi: ${DateTime.now().toIso8601String()} ===');
+  await _logStartup('args=$args, platform=${Platform.operatingSystem}');
 
-  // sqflite FFI har uch desktop platformada ishlatiladi.
-  sqfliteFfiInit();
-  databaseFactory = databaseFactoryFfi;
+  // Top-level xatolarni ushlash.
+  FlutterError.onError = (FlutterErrorDetails details) {
+    _logStartup('FLUTTER_ERROR: ${details.exception}\n${details.stack}');
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    _logStartup('PLATFORM_ERROR: $error\n$stack');
+    return true;
+  };
 
-  if (!await acquireSingleInstanceLock()) {
-    exit(0);
+  try {
+    WidgetsFlutterBinding.ensureInitialized();
+    await _logStartup('1. WidgetsFlutterBinding OK');
+  } catch (e, st) {
+    await _logStartup('WidgetsFlutterBinding FAIL: $e\n$st');
+    rethrow;
   }
 
-  // CLI argument: --key=XXX -> tezda secure vaultga yozish (msi/pkg/installer uchun)
-  await _maybeApplyKeyFromArgs(args);
+  final startHidden = args.contains('--startup-tray');
 
-  await windowManager.ensureInitialized();
-  await windowManager.setPreventClose(true);
-  const windowOptions = WindowOptions(
-    size: Size(1024, 680),
-    center: true,
-    title: AppConfig.appName,
-  );
-  windowManager.waitUntilReadyToShow(windowOptions, () async {
-    if (!startHidden) {
-      await windowManager.show();
-      await windowManager.focus();
-    } else {
-      await windowManager.hide();
+  try {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+    await _logStartup('2. sqflite FFI OK');
+  } catch (e, st) {
+    await _logStartup('sqflite FFI FAIL: $e\n$st');
+    rethrow;
+  }
+
+  try {
+    if (!await acquireSingleInstanceLock()) {
+      await _logStartup('3. Single-instance lock — boshqa instance bor, exit.');
+      exit(0);
     }
-  });
+    await _logStartup('3. Single-instance lock OK');
+  } catch (e, st) {
+    await _logStartup('Single-instance FAIL: $e\n$st');
+  }
 
-  final db = await AppDatabase.open();
-  await hydrateAppConfigFromDb(db);
+  try {
+    await _maybeApplyKeyFromArgs(args);
+    await _logStartup('4. CLI key apply OK');
+  } catch (e, st) {
+    await _logStartup('CLI key apply FAIL: $e\n$st');
+  }
+
+  try {
+    await windowManager.ensureInitialized();
+    await windowManager.setPreventClose(true);
+    const windowOptions = WindowOptions(
+      size: Size(1024, 680),
+      center: true,
+      title: AppConfig.appName,
+    );
+    windowManager.waitUntilReadyToShow(windowOptions, () async {
+      try {
+        if (!startHidden) {
+          await windowManager.show();
+          await windowManager.focus();
+          await _logStartup('5b. window show+focus OK');
+        } else {
+          await windowManager.hide();
+          await _logStartup('5b. window hide OK');
+        }
+      } catch (e, st) {
+        await _logStartup('window show/hide FAIL: $e\n$st');
+      }
+    });
+    await _logStartup('5a. windowManager init OK');
+  } catch (e, st) {
+    await _logStartup('windowManager FAIL: $e\n$st');
+    rethrow;
+  }
+
+  final AppDatabase db;
+  try {
+    db = await AppDatabase.open();
+    await _logStartup('6. AppDatabase OK');
+  } catch (e, st) {
+    await _logStartup('AppDatabase FAIL: $e\n$st');
+    rethrow;
+  }
+  try {
+    await hydrateAppConfigFromDb(db);
+    await _logStartup('7. AppConfig hydrate OK');
+  } catch (e, st) {
+    await _logStartup('AppConfig hydrate FAIL: $e\n$st');
+  }
 
   final vault = SecureVault();
   final api = ApiClient(vault);
@@ -125,6 +187,7 @@ Future<void> main(List<String> args) async {
     logger: logger,
   );
 
+  await _logStartup('8. Repositories OK, runApp boshlanmoqda...');
   runApp(
     ProviderScope(
       overrides: [
@@ -135,6 +198,27 @@ Future<void> main(List<String> args) async {
       child: InternetAgentApp(startHidden: startHidden),
     ),
   );
+  await _logStartup('9. runApp chaqirildi (UI yuklanmoqda)');
+}
+
+Future<void> _logStartup(String line) async {
+  try {
+    String path;
+    if (Platform.isWindows) {
+      final appData = Platform.environment['LOCALAPPDATA'] ?? Platform.environment['TEMP'] ?? '.';
+      final dir = Directory('$appData\\internet-monitoring-agent');
+      if (!dir.existsSync()) dir.createSync(recursive: true);
+      path = '${dir.path}\\startup.log';
+    } else {
+      final home = Platform.environment['HOME'] ?? '/tmp';
+      final dir = Directory('$home/.local/share/internet-monitoring-agent');
+      if (!dir.existsSync()) dir.createSync(recursive: true);
+      path = '${dir.path}/startup.log';
+    }
+    final f = File(path);
+    final ts = DateTime.now().toIso8601String();
+    f.writeAsStringSync('[$ts] $line\n', mode: FileMode.append, flush: true);
+  } catch (_) {}
 }
 
 Future<void> _maybeApplyKeyFromArgs(List<String> args) async {

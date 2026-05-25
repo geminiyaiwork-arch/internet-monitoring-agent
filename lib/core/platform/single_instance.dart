@@ -32,7 +32,9 @@ bool _windowsLock() {
         kernel.lookupFunction<_GetLastErrorNative, _GetLastErrorDart>(
       'GetLastError',
     );
-    final name = 'Global\\InternetMonitoringAgent_UCMS'.toNativeUtf16();
+    // Local\\ prefix — joriy user sessiyasida ishlaydi, admin permission shart emas.
+    // Global\\ ga ehtiyoj yo'q chunki agent har bir user uchun alohida ishlaydi.
+    final name = 'Local\\InternetMonitoringAgent_UCMS'.toNativeUtf16();
     final h = createMutexW(nullptr, 0, name);
     final err = getLastError();
     calloc.free(name);
