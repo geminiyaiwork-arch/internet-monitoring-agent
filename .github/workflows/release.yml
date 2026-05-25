@@ -35,6 +35,11 @@ jobs:
       - run: flutter pub get
       - run: flutter build windows --release
       - run: dart run msix:create
+      - name: Download VC++ Redistributable (MSVCP140 etc.)
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri "https://aka.ms/vs/17/release/vc_redist.x64.exe" -OutFile "windows\installer\vc_redist.x64.exe"
+          Get-Item windows\installer\vc_redist.x64.exe
       - name: Inno Setup .exe
         shell: pwsh
         run: |

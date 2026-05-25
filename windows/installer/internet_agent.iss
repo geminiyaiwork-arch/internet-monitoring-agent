@@ -1,15 +1,16 @@
 ; Internet Monitoring Agent — klassik Windows Setup (.exe)
 ;
-; Oldin: flutter build windows
-; Keyin: Inno Setup 6 o‘rnating, ushbu faylni ochib Compile (yoki ISCC bilan).
+; Build:
+;   flutter build windows --release
+;   choco install innosetup -y   (yoki qo'lda o'rnatib qo'ying)
+;   ISCC windows/installer/internet_agent.iss
 ;
-; Fayl joyi: windows/installer/internet_agent.iss
+; Natija: build/installer/InternetMonitoringAgent_Setup_<ver>.exe
 
 #define MyAppName "Internet Monitoring Agent"
 #define MyAppVersion "1.0.0"
 #define MyAppPublisher "E-MMTB"
 #define MyAppExeName "internet.exe"
-; .iss faylidan loyiha ildizigacha
 #define BuildOutput "..\\..\\build\\windows\\x64\\runner\\Release"
 
 [Setup]
@@ -34,13 +35,35 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+Name: "startupicon"; Description: "Kompyuter yonganda avtomatik ishga tushirish"; GroupDescription: "Autostart:"; Flags: checkedonce
 
 [Files]
 Source: "{#BuildOutput}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; VC++ 2015-2022 Redistributable (MSVCP140.dll va shu kabilar). Yuklanadi va run da o'rnatiladi.
+Source: "vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall; Check: VCRedistNeedsInstall
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
+Name: "{userstartup}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--startup-tray"; Tasks: startupicon
 
 [Run]
+; Avval VC++ Redistributable o'rnatish (kerak bo'lsa)
+Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Microsoft VC++ Runtime o'rnatilmoqda..."; Check: VCRedistNeedsInstall; Flags: waituntilterminated
+; Keyin asosiy dasturni ishga tushirish
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+
+[Code]
+function VCRedistNeedsInstall: Boolean;
+var
+  Version: string;
+begin
+  // MSVCP140.dll versiyasini tekshirish (VC++ 2015-2022 bir oilada).
+  if RegQueryStringValue(HKLM, 'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64', 'Version', Version) then
+  begin
+    // Versiya bor — o'rnatish kerakmas
+    Result := False;
+  end
+  else
+    Result := True;
+end;
