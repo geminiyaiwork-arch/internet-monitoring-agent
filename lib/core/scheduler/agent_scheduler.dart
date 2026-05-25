@@ -214,16 +214,16 @@ class AgentScheduler {
   }
 
   /// Hozir hamma narsani yuborish: heartbeat + processes + inventory + speed test.
-  /// Login bo'lgan zahoti yoki admin "resend_all" buyrug'i bersa chaqiriladi.
+  /// Har birini try/catch bilan o'rab, biri muvaffaqiyatsiz bo'lsa ham qolganlari ishlaydi.
   Future<void> syncNow() async {
     if (!await _auth.isLoggedIn()) return;
-    await _flushQueue();
-    await _doHeartbeat();
+    try { await _flushQueue(); } catch (_) {}
+    try { await _doHeartbeat(); } catch (_) {}
     _lastHeartbeatAt = DateTime.now().toUtc();
-    await _doProcesses();
+    try { await _doProcesses(); } catch (_) {}
     _lastProcessesAt = DateTime.now().toUtc();
-    await _inventory.sync(manual: true);
-    await _doSpeedTest();
+    try { await _inventory.sync(manual: true); } catch (_) {}
+    try { await _doSpeedTest(); } catch (_) {}
     _lastSpeedTestAt = DateTime.now().toUtc();
   }
 

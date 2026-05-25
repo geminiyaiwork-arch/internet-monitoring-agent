@@ -15,25 +15,50 @@ class MainShell extends ConsumerStatefulWidget {
 
 class _MainShellState extends ConsumerState<MainShell> {
   DateTime? _lastSync;
-  Duration _remaining = Duration.zero;
+  Duration _remaining = const Duration(minutes: 10);
   Timer? _ticker;
+  String _status = 'Yuborilmoqda...';
+  bool _syncing = false;
 
   @override
   void initState() {
     super.initState();
+    // Ticker DARHOL ishga tushadi (syncNow ni kutmasdan).
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _updateRemaining());
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // Birinchi marta login bo'lganda hamma ma'lumotni darhol yuborish.
-      try {
-        await ref.read(agentSchedulerProvider).syncNow();
-        if (mounted) setState(() => _lastSync = DateTime.now());
-      } catch (_) {}
-      // Har soniyada teskari sanoqni yangilash.
-      _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _updateRemaining());
-      _updateRemaining();
-      // 3 soniyadan keyin oynani treyga yashirish.
-      await Future.delayed(const Duration(seconds: 3));
+      // Birinchi sync ni fonda yuborish.
+      _runSync();
+      // 5 soniyadan keyin oynani treyga yashirish (status ko'rinishi uchun).
+      await Future.delayed(const Duration(seconds: 5));
       if (mounted) await windowManager.hide();
     });
+  }
+
+  Future<void> _runSync() async {
+    if (_syncing) return;
+    if (mounted) {
+      setState(() {
+        _syncing = true;
+        _status = 'Yuborilmoqda...';
+      });
+    }
+    try {
+      await ref.read(agentSchedulerProvider).syncNow();
+      if (mounted) {
+        setState(() {
+          _lastSync = DateTime.now();
+          _status = 'Muvaffaqiyatli yuborildi';
+        });
+      }
+    } catch (e) {
+      final msg = e.toString();
+      if (mounted) {
+        setState(() => _status = 'Xato: ${msg.length > 60 ? msg.substring(0, 60) : msg}');
+      }
+    } finally {
+      if (mounted) setState(() => _syncing = false);
+      _updateRemaining();
+    }
   }
 
   void _updateRemaining() {
@@ -56,13 +81,6 @@ class _MainShellState extends ConsumerState<MainShell> {
   void dispose() {
     _ticker?.cancel();
     super.dispose();
-  }
-
-  Future<void> _resyncNow() async {
-    try {
-      await ref.read(agentSchedulerProvider).syncNow();
-      _updateRemaining();
-    } catch (_) {}
   }
 
   @override
@@ -88,7 +106,14 @@ class _MainShellState extends ConsumerState<MainShell> {
                     shape: BoxShape.circle,
                     border: Border.all(color: const Color(0xFF22C55E), width: 3),
                   ),
-                  child: const Icon(Icons.check_rounded, size: 80, color: Color(0xFF15803D)),
+                  child: _syncing
+                      ? const Padding(
+                          padding: EdgeInsets.all(32),
+                          child: CircularProgressIndicator(
+                            color: Color(0xFF15803D), strokeWidth: 4,
+                          ),
+                        )
+                      : const Icon(Icons.check_rounded, size: 80, color: Color(0xFF15803D)),
                 ),
                 const SizedBox(height: 26),
                 Text(
@@ -107,8 +132,7 @@ class _MainShellState extends ConsumerState<MainShell> {
                     height: 1.5,
                   ),
                 ),
-                const SizedBox(height: 26),
-                // Teskari sanoq dumaloq
+                const SizedBox(height: 22),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
                   decoration: BoxDecoration(
@@ -118,9 +142,9 @@ class _MainShellState extends ConsumerState<MainShell> {
                   ),
                   child: Column(
                     children: [
-                      Text(
+                      const Text(
                         'Keyingi yuborishgacha',
-                        style: TextStyle(color: const Color(0xFF1E40AF), fontSize: 12, fontWeight: FontWeight.w600),
+                        style: TextStyle(color: Color(0xFF1E40AF), fontSize: 12, fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -129,21 +153,36 @@ class _MainShellState extends ConsumerState<MainShell> {
                           color: Color(0xFF1D4ED8),
                           fontSize: 36,
                           fontWeight: FontWeight.w800,
-                          fontFeatures: [FontFeature.tabularFigures()],
                         ),
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 14),
-                if (_lastSync != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: _status.startsWith('Xato') ? const Color(0xFFFEE2E2) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    _status,
+                    style: TextStyle(
+                      color: _status.startsWith('Xato') ? const Color(0xFFB91C1C) : const Color(0xFF334155),
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                if (_lastSync != null) ...[
+                  const SizedBox(height: 8),
                   Text(
                     'Oxirgi sinxronizatsiya: ${_fmt(_lastSync!)}',
-                    style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                    style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
                   ),
+                ],
                 const SizedBox(height: 10),
                 TextButton.icon(
-                  onPressed: _resyncNow,
+                  onPressed: _syncing ? null : _runSync,
                   icon: const Icon(Icons.refresh_rounded, size: 18),
                   label: const Text('Hozir yuborish'),
                 ),
