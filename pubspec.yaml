@@ -15,6 +15,9 @@ dependencies:
   dio: ^5.7.0
   sqflite_common_ffi: 2.3.3
   sqflite_common: 2.5.4
+  # sqlite3.dll'ni Windows build'iga avtomatik qo'shadi.
+  # Busiz internet.exe yonida sqlite3.dll bo'lmaydi va app crash bo'ladi.
+  sqlite3_flutter_libs: ^0.5.24
   path: ^1.9.0
   path_provider: ^2.1.5
   flutter_secure_storage: ^9.2.2
