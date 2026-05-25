@@ -47,6 +47,13 @@ class HeartbeatRepository {
     }
     final snap = _metrics.readResources();
     final fp = await _identity.machineGuidOrFingerprint();
+    final disksRaw = _metrics.listDisks();
+    final disks = disksRaw.map((d) => DiskInfo(
+          mount: d['mount']?.toString() ?? '/',
+          fs: d['fs']?.toString(),
+          totalMb: (d['total_mb'] as num?)?.toInt() ?? 0,
+          freeMb: (d['free_mb'] as num?)?.toInt() ?? 0,
+        )).toList();
     return HeartbeatRequest(
       deviceUid: fp,
       deviceName: deviceNameOverride ?? Platform.localHostname,
@@ -59,6 +66,7 @@ class HeartbeatRepository {
       localIp: localIp,
       publicIp: pubIp,
       networkStatus: net,
+      networkType: _metrics.detailedNetworkType(),
       timestamp: DateTime.now().toUtc().toIso8601String(),
       uptime: _metrics.uptimeSeconds(),
       ramTotalMb: snap.ramTotalMb,
@@ -66,6 +74,7 @@ class HeartbeatRepository {
       diskTotalMb: snap.diskTotalMb,
       diskFreeMb: snap.diskFreeMb,
       cpuUsage: snap.cpuUsagePercent,
+      disks: disks,
     );
   }
 

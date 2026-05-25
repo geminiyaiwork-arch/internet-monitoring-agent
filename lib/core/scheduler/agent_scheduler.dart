@@ -55,6 +55,13 @@ class AgentScheduler {
   DateTime? _lastCommandsAt;
   DateTime? _lastLogsAt;
 
+  /// UI uchun: keyingi heartbeat qachon yuborilishi.
+  DateTime? get nextHeartbeatAt =>
+      _lastHeartbeatAt?.add(_hbInterval);
+
+  DateTime? get lastHeartbeatAt => _lastHeartbeatAt;
+  Duration get heartbeatInterval => _hbInterval;
+
   void start() {
     _timer?.cancel();
     _timer = Timer.periodic(AppConfig.schedulerTick, (_) => _tick());

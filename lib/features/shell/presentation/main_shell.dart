@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:window_manager/window_manager.dart';
@@ -13,6 +15,8 @@ class MainShell extends ConsumerStatefulWidget {
 
 class _MainShellState extends ConsumerState<MainShell> {
   DateTime? _lastSync;
+  Duration _remaining = Duration.zero;
+  Timer? _ticker;
 
   @override
   void initState() {
@@ -23,20 +27,54 @@ class _MainShellState extends ConsumerState<MainShell> {
         await ref.read(agentSchedulerProvider).syncNow();
         if (mounted) setState(() => _lastSync = DateTime.now());
       } catch (_) {}
-      // 2 soniyadan keyin oynani treyga yashirish.
-      await Future.delayed(const Duration(seconds: 2));
+      // Har soniyada teskari sanoqni yangilash.
+      _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _updateRemaining());
+      _updateRemaining();
+      // 3 soniyadan keyin oynani treyga yashirish.
+      await Future.delayed(const Duration(seconds: 3));
       if (mounted) await windowManager.hide();
     });
+  }
+
+  void _updateRemaining() {
+    if (!mounted) return;
+    final scheduler = ref.read(agentSchedulerProvider);
+    final next = scheduler.nextHeartbeatAt;
+    final last = scheduler.lastHeartbeatAt;
+    setState(() {
+      if (next == null) {
+        _remaining = scheduler.heartbeatInterval;
+      } else {
+        final diff = next.difference(DateTime.now().toUtc());
+        _remaining = diff.isNegative ? Duration.zero : diff;
+      }
+      if (last != null) _lastSync = last.toLocal();
+    });
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _resyncNow() async {
+    try {
+      await ref.read(agentSchedulerProvider).syncNow();
+      _updateRemaining();
+    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final m = _remaining.inMinutes;
+    final s = _remaining.inSeconds % 60;
     return Scaffold(
       backgroundColor: const Color(0xFFF5F8FB),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 460),
+          constraints: const BoxConstraints(maxWidth: 480),
           child: Padding(
             padding: const EdgeInsets.all(28),
             child: Column(
@@ -62,26 +100,53 @@ class _MainShellState extends ConsumerState<MainShell> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Monitoring agenti faollashtirildi.\nMa’lumotlar har 10 daqiqada saytga uzatiladi.',
+                  'Monitoring agenti faollashtirildi.\nMa\'lumotlar har 10 daqiqada saytga uzatiladi.',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: const Color(0xFF475569),
                     height: 1.5,
                   ),
                 ),
-                const SizedBox(height: 22),
-                if (_lastSync != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE0F2FE),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      'Oxirgi sinxronizatsiya: ${_fmt(_lastSync!)}',
-                      style: const TextStyle(color: Color(0xFF075985), fontSize: 12),
-                    ),
+                const SizedBox(height: 26),
+                // Teskari sanoq dumaloq
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
                   ),
+                  child: Column(
+                    children: [
+                      Text(
+                        'Keyingi yuborishgacha',
+                        style: TextStyle(color: const Color(0xFF1E40AF), fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}',
+                        style: const TextStyle(
+                          color: Color(0xFF1D4ED8),
+                          fontSize: 36,
+                          fontWeight: FontWeight.w800,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                if (_lastSync != null)
+                  Text(
+                    'Oxirgi sinxronizatsiya: ${_fmt(_lastSync!)}',
+                    style: const TextStyle(color: Color(0xFF64748B), fontSize: 13),
+                  ),
+                const SizedBox(height: 10),
+                TextButton.icon(
+                  onPressed: _resyncNow,
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Hozir yuborish'),
+                ),
               ],
             ),
           ),

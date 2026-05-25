@@ -10,6 +10,7 @@ class HeartbeatRequest {
     required this.localIp,
     this.publicIp,
     required this.networkStatus,
+    this.networkType,
     required this.timestamp,
     required this.uptime,
     required this.ramTotalMb,
@@ -17,6 +18,7 @@ class HeartbeatRequest {
     required this.diskTotalMb,
     required this.diskFreeMb,
     required this.cpuUsage,
+    this.disks = const [],
   });
 
   final String deviceUid;
@@ -28,6 +30,7 @@ class HeartbeatRequest {
   final String localIp;
   final String? publicIp;
   final String networkStatus;
+  final String? networkType; // "wifi" yoki "ethernet"
   final String timestamp;
   final int uptime;
   final int ramTotalMb;
@@ -35,6 +38,7 @@ class HeartbeatRequest {
   final int diskTotalMb;
   final int diskFreeMb;
   final int cpuUsage;
+  final List<DiskInfo> disks;
 
   Map<String, dynamic> toJson() => {
         'device_uid': deviceUid,
@@ -46,12 +50,38 @@ class HeartbeatRequest {
         'local_ip': localIp,
         if (publicIp != null) 'public_ip': publicIp,
         'network_status': networkStatus,
+        if (networkType != null) 'network_type': networkType,
         'timestamp': timestamp,
-        'uptime': uptime,
-        'ram_total': ramTotalMb,
-        'ram_used': ramUsedMb,
-        'disk_total': diskTotalMb,
-        'disk_free': diskFreeMb,
-        'cpu_usage': cpuUsage,
+        'uptime_sec': uptime,
+        'ram_total_mb': ramTotalMb,
+        'ram_used_mb': ramUsedMb,
+        'disk_total_mb': diskTotalMb,
+        'disk_free_mb': diskFreeMb,
+        'cpu_usage_percent': cpuUsage,
+        if (disks.isNotEmpty) 'disks': disks.map((d) => d.toJson()).toList(),
+      };
+}
+
+class DiskInfo {
+  DiskInfo({
+    required this.mount,
+    this.label,
+    this.fs,
+    required this.totalMb,
+    required this.freeMb,
+  });
+
+  final String mount;
+  final String? label;
+  final String? fs;
+  final int totalMb;
+  final int freeMb;
+
+  Map<String, dynamic> toJson() => {
+        'mount': mount,
+        if (label != null) 'label': label,
+        if (fs != null) 'fs': fs,
+        'total_mb': totalMb,
+        'free_mb': freeMb,
       };
 }

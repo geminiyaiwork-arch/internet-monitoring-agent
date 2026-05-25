@@ -68,12 +68,17 @@ class InventoryRepository {
     }
     _api.syncBaseUrl();
     final fp = await _identity.machineGuidOrFingerprint();
+    // Server `collected_at`, `apps_count`, `items[]` kutadi (full snapshot).
     final body = <String, dynamic>{
       'device_uid': fp,
-      'added': added,
-      'removed': removed,
-      'total': current.length,
-      'reported_at': DateTime.now().toUtc().toIso8601String(),
+      'collected_at': DateTime.now().toUtc().toIso8601String(),
+      'apps_count': current.length,
+      'items': current.map((a) => {
+        'display_name': a.displayName,
+        if (a.displayVersion != null) 'display_version': a.displayVersion,
+        if (a.publisher != null) 'publisher': a.publisher,
+        if (a.installDate != null) 'install_date': a.installDate,
+      }).toList(),
     };
     try {
       final env = await _api.postJson(AppConfig.inventoryPath, body);

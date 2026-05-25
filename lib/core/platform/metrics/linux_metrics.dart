@@ -3,6 +3,63 @@ import 'dart:io';
 import '../system_metrics_collector.dart';
 
 class LinuxMetrics {
+  /// Mount qilingan disklar ro'yxati ({mount, fs, total_mb, free_mb}).
+  static List<Map<String, dynamic>> listDisks() {
+    if (!Platform.isLinux) return const [];
+    final result = <Map<String, dynamic>>[];
+    try {
+      // df -k -T -x tmpfs -x devtmpfs -x squashfs -x overlay -x proc -x sysfs -x cgroup
+      final res = Process.runSync('df', ['-k', '-T', '-x', 'tmpfs', '-x', 'devtmpfs', '-x', 'squashfs', '-x', 'overlay']);
+      final lines = res.stdout.toString().split('\n');
+      for (var i = 1; i < lines.length; i++) {
+        final parts = lines[i].split(RegExp(r'\s+')).where((s) => s.isNotEmpty).toList();
+        if (parts.length < 7) continue;
+        final fs = parts[1];
+        final totalKb = int.tryParse(parts[2]) ?? 0;
+        final usedKb = int.tryParse(parts[3]) ?? 0;
+        final mount = parts[6];
+        if (totalKb <= 0) continue;
+        // /boot/efi va /snap kabilarni o'tkazib yuborish
+        if (mount.startsWith('/boot') || mount.startsWith('/snap') || mount.startsWith('/run')) continue;
+        result.add({
+          'mount': mount,
+          'fs': fs,
+          'total_mb': (totalKb ~/ 1024),
+          'free_mb': ((totalKb - usedKb) ~/ 1024).clamp(0, totalKb ~/ 1024),
+        });
+      }
+    } catch (_) {}
+    return result;
+  }
+
+  /// "wifi" yoki "ethernet" yoki null
+  static String? networkType() {
+    if (!Platform.isLinux) return null;
+    try {
+      // /sys/class/net/* — wireless papka borligini tekshirish
+      final netDir = Directory('/sys/class/net');
+      if (!netDir.existsSync()) return null;
+      String? type;
+      for (final iface in netDir.listSync()) {
+        final name = iface.path.split('/').last;
+        if (name == 'lo' || name.startsWith('docker') || name.startsWith('veth') || name.startsWith('br-')) continue;
+        // operstate=up bo'lganini tanlash
+        try {
+          final op = File('${iface.path}/operstate').readAsStringSync().trim();
+          if (op != 'up') continue;
+        } catch (_) { continue; }
+        if (Directory('${iface.path}/wireless').existsSync()) {
+          return 'wifi';
+        }
+        type ??= 'ethernet';
+      }
+      return type;
+    } catch (_) {
+      return null;
+    }
+  }
+
+
   static int uptimeSeconds() {
     if (!Platform.isLinux) return 0;
     try {

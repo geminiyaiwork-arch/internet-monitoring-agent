@@ -28,11 +28,8 @@ class SpeedTestResult {
   Map<String, dynamic> toJson() => {
         'download_mbps': double.parse(downloadMbps.toStringAsFixed(2)),
         'upload_mbps': double.parse(uploadMbps.toStringAsFixed(2)),
-        'latency_ms': latencyMs,
-        'bytes_down': bytesDown,
-        'bytes_up': bytesUp,
-        if (serverHost != null) 'server': serverHost,
-        if (error != null) 'error': error,
+        'ping_ms': latencyMs,
+        if (serverHost != null) 'server_name': serverHost,
         'tested_at': testedAt.toUtc().toIso8601String(),
       };
 }

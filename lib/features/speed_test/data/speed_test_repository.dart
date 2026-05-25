@@ -36,13 +36,14 @@ class SpeedTestRepository {
     if (key == null || key.isEmpty) {
       return ApiEnvelope(success: false, message: 'Not authenticated');
     }
+    // Cloudflare ning bepul speed test endpointlari — global CDN tarmog'ida ishlaydi.
     final downloadUrl =
         await _db.getSetting('speedtest_download_url') ??
-            '${AppConfig.instance.baseUrl}/speed-test/download';
+            'https://speed.cloudflare.com/__down';
     final uploadUrl = await _db.getSetting('speedtest_upload_url') ??
-        '${AppConfig.instance.baseUrl}/speed-test/upload';
+        'https://speed.cloudflare.com/__up';
     final latencyUrl = await _db.getSetting('speedtest_latency_url') ??
-        '${AppConfig.instance.baseUrl}/speed-test/ping';
+        'https://speed.cloudflare.com/__down?bytes=10';
 
     final result = await _client.run(
       downloadUrl: downloadUrl,

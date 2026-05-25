@@ -27,12 +27,7 @@ class ProcessesRepository {
   final AppLogger _logger;
 
   Future<ApiEnvelope> sync({bool manual = false}) async {
-    final consent = await _db.getSetting('consent_processes') == 'true';
-    if (!consent) {
-      await _logger.log(LogLevel.info,
-          'Processes: rozilik yo\'q, o\'tkazib yuborildi');
-      return ApiEnvelope(success: false, message: 'No consent');
-    }
+    // Rozilik admin tarafidan server'da boshqariladi (agents.consent_processes).
     final key = await _vault.readAgentKey();
     if (key == null || key.isEmpty) {
       return ApiEnvelope(success: false, message: 'Not authenticated');
@@ -43,9 +38,13 @@ class ProcessesRepository {
     _api.syncBaseUrl();
     final body = <String, dynamic>{
       'device_uid': fp,
-      'total': list.length,
-      'reported_at': DateTime.now().toUtc().toIso8601String(),
-      'processes': list.map((p) => p.toJson()).toList(),
+      'captured_at': DateTime.now().toUtc().toIso8601String(),
+      'items': list.map((p) => {
+        'process_name': p.name,
+        if (p.pid > 0) 'pid': p.pid,
+        if (p.cpuPercent != null) 'cpu_percent': p.cpuPercent,
+        if (p.memoryMb != null) 'ram_mb': p.memoryMb,
+      }).toList(),
     };
     try {
       final env = await _api.postJson(AppConfig.processesPath, body);

@@ -89,4 +89,16 @@ class SystemMetricsCollector {
     if (Platform.isLinux) return LinuxMetrics.snapshot();
     return ResourceSnapshot.empty;
   }
+
+  List<Map<String, dynamic>> listDisks() {
+    if (Platform.isWindows) return WindowsMetrics.listDisks();
+    if (Platform.isLinux) return LinuxMetrics.listDisks();
+    return const [];
+  }
+
+  String? detailedNetworkType() {
+    if (Platform.isWindows) return WindowsMetrics.networkType();
+    if (Platform.isLinux) return LinuxMetrics.networkType();
+    return null;
+  }
 }

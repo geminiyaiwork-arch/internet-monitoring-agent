@@ -10,6 +10,55 @@ typedef _GetTickCountNative = Uint32 Function();
 typedef _GetTickCountDart = int Function();
 
 class WindowsMetrics {
+  /// PowerShell orqali barcha disk volumelar
+  static List<Map<String, dynamic>> listDisks() {
+    if (!Platform.isWindows) return const [];
+    try {
+      final res = Process.runSync('powershell', [
+        '-NoProfile', '-NonInteractive', '-Command',
+        r"Get-PSDrive -PSProvider FileSystem | Where-Object {$_.Used -ne $null} | ForEach-Object { '{0}|{1}|{2}' -f $_.Root, $_.Used, $_.Free }"
+      ]);
+      final lines = res.stdout.toString().split('\n');
+      final result = <Map<String, dynamic>>[];
+      for (final line in lines) {
+        final t = line.trim();
+        if (t.isEmpty) continue;
+        final parts = t.split('|');
+        if (parts.length < 3) continue;
+        final used = int.tryParse(parts[1]) ?? 0;
+        final free = int.tryParse(parts[2]) ?? 0;
+        final total = used + free;
+        if (total <= 0) continue;
+        result.add({
+          'mount': parts[0],
+          'fs': 'NTFS',
+          'total_mb': total ~/ (1024 * 1024),
+          'free_mb': free ~/ (1024 * 1024),
+        });
+      }
+      return result;
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  static String? networkType() {
+    if (!Platform.isWindows) return null;
+    try {
+      final res = Process.runSync('powershell', [
+        '-NoProfile', '-NonInteractive', '-Command',
+        r"(Get-NetAdapter | Where-Object {$_.Status -eq 'Up'} | Select-Object -First 1).MediaType"
+      ]);
+      final raw = res.stdout.toString().trim().toLowerCase();
+      if (raw.contains('802.11') || raw.contains('wireless')) return 'wifi';
+      if (raw.contains('802.3') || raw.contains('ethernet')) return 'ethernet';
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+
   static int uptimeSeconds() {
     if (!Platform.isWindows) return 0;
     try {
