@@ -31,6 +31,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       _error = null;
     });
     final key = _keyCtrl.text.trim();
+    debugPrint('LOGIN: submit pressed, key length=${key.length}');
     if (key.isEmpty) {
       setState(() {
         _busy = false;
@@ -38,7 +39,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       });
       return;
     }
-    // Kalit XXXX-XXXX-XXXX formatida bo'lsin.
     final norm = key.toUpperCase();
     if (!RegExp(r'^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$').hasMatch(norm)) {
       setState(() {
@@ -47,11 +47,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       });
       return;
     }
+    debugPrint('LOGIN: calling loginWithKey($norm)');
     final auth = ref.read(authRepositoryProvider);
     final env = await auth.loginWithKey(norm);
+    debugPrint('LOGIN: result success=${env.success} message=${env.message}');
     if (!mounted) return;
     setState(() => _busy = false);
     if (env.success) {
+      debugPrint('LOGIN: refreshing authSession');
       await ref.read(authSessionProvider.notifier).refresh();
     } else {
       setState(() => _error = env.message ?? 'Kalit qabul qilinmadi.');

@@ -145,8 +145,6 @@ Future<void> hydrateAppConfigFromDb(AppDatabase db) async {
   if (bu != null && bu.isNotEmpty) {
     AppConfig.instance.baseUrl = bu;
   }
-  final mock = await db.getSetting('use_mock_api');
-  if (mock != null) {
-    AppConfig.instance.useMockApi = mock == 'true';
-  }
+  // Mock har doim o'chiq — production.
+  AppConfig.instance.useMockApi = false;
 }

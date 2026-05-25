@@ -2,8 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:window_manager/window_manager.dart';
-
 import '../../../shared/providers/providers.dart';
 
 class MainShell extends ConsumerStatefulWidget {
@@ -28,9 +26,7 @@ class _MainShellState extends ConsumerState<MainShell> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       // Birinchi sync ni fonda yuborish.
       _runSync();
-      // 5 soniyadan keyin oynani treyga yashirish (status ko'rinishi uchun).
-      await Future.delayed(const Duration(seconds: 5));
-      if (mounted) await windowManager.hide();
+      // Oyna ochiq qoladi — foydalanuvchi o'zi yopadi (X tugmasi treyga yashiradi).
     });
   }
 

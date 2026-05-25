@@ -63,8 +63,14 @@ class _InternetAgentAppState extends ConsumerState<InternetAgentApp>
     switch (cmd) {
       case TrayCommand.openDashboard:
         ref.read(shellTabProvider.notifier).state = 0;
+        // Restore + show + focus (Linux WMs hide bo'lgan oynani show() bilan
+        // qaytarmasligi mumkin, restore() majburlaydi).
+        try { await windowManager.restore(); } catch (_) {}
         await windowManager.show();
         await windowManager.focus();
+        await windowManager.setAlwaysOnTop(true);
+        await Future.delayed(const Duration(milliseconds: 200));
+        await windowManager.setAlwaysOnTop(false);
         break;
       case TrayCommand.syncNow:
         await ref.read(agentSchedulerProvider).syncNow();
