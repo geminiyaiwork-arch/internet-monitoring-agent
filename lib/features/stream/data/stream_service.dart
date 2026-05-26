@@ -96,17 +96,40 @@ class StreamService {
         return;
       }
       // baseUrl allaqachon /api/v1 bilan tugaydi, shu sababli path /v1 prefix'siz.
+      // To'g'ridan-to'g'ri Uint8List jo'natamiz — Stream.fromIterable Dio'da
+      // ba'zan content-length mismatch sababli muvaffaqiyatsiz bo'ladi.
       final res = await api.dio.post<dynamic>(
         '/agent/stream/$sessionId/frame',
-        data: Stream.fromIterable([jpeg]),
+        data: jpeg,
         options: api.binaryOptions(agentKey: agentKey, length: jpeg.length),
       );
       if (res.statusCode == 410) {
         await stop(reason: 'session_ended');
         return;
       }
+      if (res.statusCode == null || res.statusCode! < 200 || res.statusCode! >= 300) {
+        _consecutiveFailures++;
+        if (_framesSent < 3 || _consecutiveFailures % 5 == 0) {
+          await logger.log(
+            LogLevel.warn,
+            'Frame HTTP ${res.statusCode}: ${res.data}',
+            context: 'stream',
+          );
+        }
+        if (_consecutiveFailures >= 20) {
+          await stop(reason: 'http_errors');
+        }
+        return;
+      }
       _framesSent++;
       _consecutiveFailures = 0;
+      if (_framesSent <= 2 || _framesSent % 30 == 0) {
+        await logger.log(
+          LogLevel.info,
+          'Frame #$_framesSent yuborildi (${jpeg.length} bayt, status ${res.statusCode})',
+          context: 'stream',
+        );
+      }
     } catch (e) {
       _consecutiveFailures++;
       if (_consecutiveFailures % 5 == 0) {

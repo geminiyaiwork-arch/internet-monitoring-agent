@@ -107,8 +107,9 @@ class ApiClient {
       },
       sendTimeout: const Duration(seconds: 8),
       receiveTimeout: const Duration(seconds: 5),
-      // Frame yuborilmasdan ham keyingisi yuborilsin (status 410/422 silent fail OK).
-      validateStatus: (code) => code != null && code >= 200 && code < 500,
+      // Har qanday holatda ham response qaytarsin — call site o'zi qaror qiladi.
+      // Bu yo'l bilan 4xx/5xx ni alohida log qila olamiz (silent fail emas).
+      validateStatus: (code) => true,
     );
   }
 }

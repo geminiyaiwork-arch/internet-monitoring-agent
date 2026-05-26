@@ -225,6 +225,12 @@ class AgentScheduler {
       final kind = row['kind'] as String;
       final body = jsonDecode(row['body'] as String) as Map<String, dynamic>;
       final attempts = (row['attempt_count'] as int?) ?? 0;
+      // 5 dan ortiq urinishdan keyin tashlab yuboramiz — heartbeat'da ko'p marta
+      // duplicate xato bo'lganda queue cheksiz o'sib ketmasin.
+      if (attempts >= 5) {
+        await _db.deleteQueueItem(id);
+        continue;
+      }
       try {
         if (kind == 'heartbeat') {
           final env = await _heartbeat.postHeartbeatJson(
