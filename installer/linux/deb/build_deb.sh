@@ -88,11 +88,81 @@ Description: Internet Monitoring Agent
  snapshot for the central admin panel.
 EOF
 
-# postinst — agentni user-mode systemd'ga yozish
+# postinst — agentni user-mode systemd'ga yozish + Wayland'ni o'chirish
+# (screen monitoring uchun X11 kerak, Wayland xavfsizlik chegaralari sababli)
 cat > "$DEB_ROOT/DEBIAN/postinst" <<'EOF'
 #!/bin/bash
 set -e
 chmod +x /opt/internet-monitoring-agent/internet || true
+
+# === X11 majburiy: barcha display manager'larda Wayland'ni o'chirish ===
+# Screen capture (scrot, ffmpeg, import) Wayland'da ishlamaydi.
+# Bu o'zgartirish keyingi login'dan keyin kuchga kiradi.
+
+WAYLAND_DISABLED=0
+
+# GDM3 (Ubuntu, Debian, Kali)
+if [ -f /etc/gdm3/daemon.conf ]; then
+    if grep -q "^WaylandEnable=" /etc/gdm3/daemon.conf; then
+        sed -i 's/^WaylandEnable=.*/WaylandEnable=false/' /etc/gdm3/daemon.conf
+    elif grep -q "^#WaylandEnable=" /etc/gdm3/daemon.conf; then
+        sed -i 's/^#WaylandEnable=.*/WaylandEnable=false/' /etc/gdm3/daemon.conf
+    else
+        # [daemon] sectioniga qo'shish
+        if grep -q "^\[daemon\]" /etc/gdm3/daemon.conf; then
+            sed -i '/^\[daemon\]/a WaylandEnable=false' /etc/gdm3/daemon.conf
+        else
+            echo -e "[daemon]\nWaylandEnable=false" >> /etc/gdm3/daemon.conf
+        fi
+    fi
+    WAYLAND_DISABLED=1
+    echo "[IMA] GDM3 sozlandi: WaylandEnable=false"
+fi
+
+# GDM (Fedora, RHEL, CentOS)
+if [ -f /etc/gdm/custom.conf ]; then
+    if grep -q "^WaylandEnable=" /etc/gdm/custom.conf; then
+        sed -i 's/^WaylandEnable=.*/WaylandEnable=false/' /etc/gdm/custom.conf
+    elif grep -q "^#WaylandEnable=" /etc/gdm/custom.conf; then
+        sed -i 's/^#WaylandEnable=.*/WaylandEnable=false/' /etc/gdm/custom.conf
+    else
+        if grep -q "^\[daemon\]" /etc/gdm/custom.conf; then
+            sed -i '/^\[daemon\]/a WaylandEnable=false' /etc/gdm/custom.conf
+        else
+            echo -e "[daemon]\nWaylandEnable=false" >> /etc/gdm/custom.conf
+        fi
+    fi
+    WAYLAND_DISABLED=1
+    echo "[IMA] GDM sozlandi: WaylandEnable=false"
+fi
+
+# SDDM (KDE Plasma)
+if [ -d /etc/sddm.conf.d ] || [ -f /etc/sddm.conf ]; then
+    mkdir -p /etc/sddm.conf.d
+    cat > /etc/sddm.conf.d/10-internet-agent-x11.conf <<SDDM
+[General]
+DisplayServer=x11
+SDDM
+    WAYLAND_DISABLED=1
+    echo "[IMA] SDDM sozlandi: DisplayServer=x11"
+fi
+
+# LightDM (XFCE, MATE) — odatda X11 default, lekin ehtiyot uchun
+if [ -d /etc/lightdm/lightdm.conf.d ]; then
+    cat > /etc/lightdm/lightdm.conf.d/10-internet-agent-x11.conf <<LDM
+[Seat:*]
+greeter-session=lightdm-gtk-greeter
+LDM
+fi
+
+if [ "$WAYLAND_DISABLED" = "1" ]; then
+    echo "[IMA] ============================================"
+    echo "[IMA] Screen monitoring uchun X11 yoqildi."
+    echo "[IMA] Foydalanuvchi keyingi LOGIN'da X11'da kiradi."
+    echo "[IMA] Joriy sessiya hali Wayland'da bo'lishi mumkin."
+    echo "[IMA] ============================================"
+fi
+
 # Foydalanuvchi qo'lda yoqishi mumkin: systemctl --user enable --now internet-agent.service
 exit 0
 EOF

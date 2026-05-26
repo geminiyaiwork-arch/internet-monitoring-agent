@@ -215,6 +215,8 @@ class StreamService {
   /// chiqaradi (kichik fayl hajmi qora rasm belgisi).
   String? _firstWorkingTool; // muvaffaqiyatli usulni cache qilamiz
 
+  bool _waylandWarned = false;
+
   Future<String?> _captureLinux(String outPath) async {
     final env = Platform.environment;
     final isWayland = env['XDG_SESSION_TYPE'] == 'wayland' ||
@@ -222,6 +224,19 @@ class StreamService {
     final isGnome = (env['XDG_CURRENT_DESKTOP'] ?? '').toLowerCase().contains('gnome') ||
         env['GNOME_DESKTOP_SESSION_ID']?.isNotEmpty == true;
     final isKde = (env['XDG_CURRENT_DESKTOP'] ?? '').toLowerCase().contains('kde');
+
+    // Bir martalik ogohlantirish — agar Wayland aniqlangan bo'lsa, foydalanuvchini bilib qo'ysin.
+    if (isWayland && !_waylandWarned) {
+      _waylandWarned = true;
+      await logger.log(
+        LogLevel.warn,
+        'WAYLAND SESSION aniqlandi — screen capture juda cheklangan. '
+        'X11 sessiyasiga o\'tish kerak: LOGOUT qiling va login ekranida '
+        'shesternya tugmasidan "GNOME on Xorg" tanlang. .deb avtomatik '
+        'WaylandEnable=false sozladi, keyingi REBOOT yoki LOGIN dan keyin X11 default bo\'ladi.',
+        context: 'stream',
+      );
+    }
 
     // Avval cache'lagan usulni sinab ko'ramiz — har safar qaytadan probe qilmaymiz.
     if (_firstWorkingTool != null) {
