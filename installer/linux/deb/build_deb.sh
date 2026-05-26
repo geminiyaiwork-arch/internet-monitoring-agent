@@ -31,6 +31,10 @@ mkdir -p "$DEB_ROOT/usr/share/applications"
 mkdir -p "$DEB_ROOT/usr/share/icons/hicolor/256x256/apps"
 mkdir -p "$DEB_ROOT/usr/lib/systemd/user"
 mkdir -p "$DEB_ROOT/etc/xdg/autostart"
+mkdir -p "$DEB_ROOT/usr/bin"
+
+# PATH ichida `internet-monitoring-agent` buyrug'i bo'lishi uchun symlink.
+ln -sf /opt/internet-monitoring-agent/internet "$DEB_ROOT/usr/bin/internet-monitoring-agent"
 
 cp -r "$BUILD_OUT"/* "$DEB_ROOT/opt/internet-monitoring-agent/"
 cp "$ROOT/installer/linux/systemd/internet-agent.service" \
@@ -75,7 +79,7 @@ Version: ${VERSION}
 Section: net
 Priority: optional
 Architecture: ${ARCH}
-Depends: libgtk-3-0, libsecret-1-0, libayatana-appindicator3-1
+Depends: libgtk-3-0, libsecret-1-0, libayatana-appindicator3-1, scrot | grim | gnome-screenshot | imagemagick
 Maintainer: E-MMTB <admin@e-mmtb.uz>
 Description: Internet Monitoring Agent
  Authorized education monitoring agent for Linux desktops.
