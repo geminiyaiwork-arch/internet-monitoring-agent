@@ -95,8 +95,9 @@ class StreamService {
         await stop(reason: 'no_key');
         return;
       }
+      // baseUrl allaqachon /api/v1 bilan tugaydi, shu sababli path /v1 prefix'siz.
       final res = await api.dio.post<dynamic>(
-        '/v1/agent/stream/$sessionId/frame',
+        '/agent/stream/$sessionId/frame',
         data: Stream.fromIterable([jpeg]),
         options: api.binaryOptions(agentKey: agentKey, length: jpeg.length),
       );
