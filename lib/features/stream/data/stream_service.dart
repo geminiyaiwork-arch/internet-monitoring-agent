@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:screen_capturer/screen_capturer.dart';
 
 import '../../../core/logging/app_logger.dart';
+// LogLevel for log() calls (this file uses logger.log).
 import '../../../core/network/api_client.dart';
 import '../../../core/secure/secure_vault.dart';
 
@@ -46,11 +47,10 @@ class StreamService {
     _consecutiveFailures = 0;
     _framesSent = 0;
     final intervalMs = (1000 / fps.clamp(1, 5)).round();
-    logger.log(
-      level: 'info',
-      area: 'stream',
-      message:
-          'Stream boshlandi: session=$sessionId, fps=$fps, quality=$jpegQuality, interval=${intervalMs}ms',
+    await logger.log(
+      LogLevel.info,
+      'Stream boshlandi: session=$sessionId, fps=$fps, quality=$jpegQuality, interval=${intervalMs}ms',
+      context: 'stream',
     );
     _ticker = Timer.periodic(Duration(milliseconds: intervalMs), (_) {
       _captureAndSend(jpegQuality);
@@ -63,11 +63,10 @@ class StreamService {
     final id = _activeSessionId;
     _activeSessionId = null;
     if (id != null) {
-      logger.log(
-        level: 'info',
-        area: 'stream',
-        message:
-            'Stream to\'xtatildi: session=$id, reason=$reason, frames=$_framesSent',
+      await logger.log(
+        LogLevel.info,
+        'Stream to\'xtatildi: session=$id, reason=$reason, frames=$_framesSent',
+        context: 'stream',
       );
     }
   }
@@ -82,11 +81,10 @@ class StreamService {
       if (jpeg == null) {
         _consecutiveFailures++;
         if (_consecutiveFailures >= 10) {
-          logger.log(
-            level: 'error',
-            area: 'stream',
-            message:
-                'Stream: 10 ta ketma-ket capture xato — to\'xtatilmoqda',
+          await logger.log(
+            LogLevel.error,
+            'Stream: 10 ta ketma-ket capture xato — to\'xtatilmoqda',
+            context: 'stream',
           );
           await stop(reason: 'capture_failed');
         }
@@ -111,10 +109,10 @@ class StreamService {
     } catch (e) {
       _consecutiveFailures++;
       if (_consecutiveFailures % 5 == 0) {
-        logger.log(
-          level: 'warning',
-          area: 'stream',
-          message: 'Stream frame yuborilmadi (#$_consecutiveFailures): $e',
+        await logger.log(
+          LogLevel.warn,
+          'Stream frame yuborilmadi (#$_consecutiveFailures): $e',
+          context: 'stream',
         );
       }
       if (_consecutiveFailures >= 20) {
