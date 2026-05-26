@@ -210,40 +210,127 @@ class StreamService {
     }
   }
 
-  /// Linux'da bir nechta capture vositasini sinab ko'rish:
-  /// scrot (X11) -> grim (Wayland) -> gnome-screenshot -> import (imagemagick).
+  /// Linux'da screen capture — har xil desktop muhitlarida ishlaydigan
+  /// usullarning to'liq zanjiri. Yutgan usul "qora bo'lmagan" rasm ishlab
+  /// chiqaradi (kichik fayl hajmi qora rasm belgisi).
+  String? _firstWorkingTool; // muvaffaqiyatli usulni cache qilamiz
+
   Future<String?> _captureLinux(String outPath) async {
-    // X11/Wayland session aniqlash.
-    final isWayland = Platform.environment['XDG_SESSION_TYPE'] == 'wayland' ||
-        Platform.environment['WAYLAND_DISPLAY']?.isNotEmpty == true;
+    final env = Platform.environment;
+    final isWayland = env['XDG_SESSION_TYPE'] == 'wayland' ||
+        (env['WAYLAND_DISPLAY']?.isNotEmpty ?? false);
+    final isGnome = (env['XDG_CURRENT_DESKTOP'] ?? '').toLowerCase().contains('gnome') ||
+        env['GNOME_DESKTOP_SESSION_ID']?.isNotEmpty == true;
+    final isKde = (env['XDG_CURRENT_DESKTOP'] ?? '').toLowerCase().contains('kde');
 
-    // Tartib: Wayland bo'lsa grim birinchi, X11 bo'lsa scrot birinchi.
-    final attempts = isWayland
-        ? [
-            ['grim', [outPath]],
-            ['gnome-screenshot', ['-f', outPath]],
-            ['scrot', ['-o', outPath]],
-          ]
-        : [
-            ['scrot', ['-o', outPath]],
-            ['import', ['-window', 'root', outPath]],
-            ['gnome-screenshot', ['-f', outPath]],
-            ['grim', [outPath]],
-          ];
+    // Avval cache'lagan usulni sinab ko'ramiz — har safar qaytadan probe qilmaymiz.
+    if (_firstWorkingTool != null) {
+      final ok = await _runCapture(_firstWorkingTool!, outPath, env);
+      if (ok) return outPath;
+      _firstWorkingTool = null; // qaytadan probe qilamiz
+    }
 
-    for (final entry in attempts) {
-      final cmd = entry[0] as String;
-      final args = entry[1] as List<String>;
-      try {
-        final res = await Process.run(cmd, args,
-            runInShell: false, environment: Platform.environment);
-        if (res.exitCode == 0 && File(outPath).existsSync()) {
-          return outPath;
-        }
-      } catch (_) {
-        // Komanda topilmadi yoki ishlamadi — keyingisini sinaymiz.
+    // Tartib: avval current DE/session uchun eng yaxshilari, keyin fallback'lar.
+    final order = <String>[];
+    if (isWayland && isGnome) {
+      order.addAll(['gnome-dbus', 'gnome-screenshot', 'grim', 'ffmpeg-x11', 'scrot', 'import']);
+    } else if (isWayland && isKde) {
+      order.addAll(['kde-dbus', 'spectacle', 'grim', 'ffmpeg-x11', 'scrot']);
+    } else if (isWayland) {
+      order.addAll(['grim', 'gnome-screenshot', 'ffmpeg-x11', 'scrot']);
+    } else {
+      // X11 yoki noma'lum
+      order.addAll(['scrot', 'import', 'ffmpeg-x11', 'gnome-screenshot', 'grim']);
+    }
+
+    for (final tool in order) {
+      final ok = await _runCapture(tool, outPath, env);
+      if (ok) {
+        _firstWorkingTool = tool;
+        await logger.log(LogLevel.info,
+            'Linux capture: $tool yutdi', context: 'stream');
+        return outPath;
       }
     }
+    await logger.log(LogLevel.error,
+        'Linux capture: hech bir usul ishlamadi (sinalgan: ${order.join(",")})',
+        context: 'stream');
     return null;
+  }
+
+  Future<bool> _runCapture(String tool, String outPath, Map<String, String> env) async {
+    // Eski faylni o'chirib qaytadan yaratamiz, aks holda eski rasm qoladi.
+    try { File(outPath).deleteSync(); } catch (_) {}
+
+    try {
+      late ProcessResult res;
+      switch (tool) {
+        case 'gnome-dbus':
+          // GNOME Shell o'z D-Bus orqali screenshot (Wayland'da ishlaydi, ruxsat shart emas).
+          res = await Process.run('gdbus', [
+            'call', '--session',
+            '--dest', 'org.gnome.Shell.Screenshot',
+            '--object-path', '/org/gnome/Shell/Screenshot',
+            '--method', 'org.gnome.Shell.Screenshot.Screenshot',
+            'true', 'false', outPath,
+          ], environment: env);
+          break;
+        case 'kde-dbus':
+          // KDE Plasma KWin screenshot
+          res = await Process.run('gdbus', [
+            'call', '--session',
+            '--dest', 'org.kde.KWin.ScreenShot2',
+            '--object-path', '/org/kde/KWin/ScreenShot2',
+            '--method', 'org.kde.KWin.ScreenShot2.CaptureWorkspace',
+            '{}', '0',
+          ], environment: env);
+          // KDE qaytaradi fd, oddiy fayl emas — pass o'tkazib yuboramiz hozircha.
+          break;
+        case 'scrot':
+          res = await Process.run('scrot', ['-o', outPath], environment: env);
+          break;
+        case 'grim':
+          res = await Process.run('grim', [outPath], environment: env);
+          break;
+        case 'gnome-screenshot':
+          res = await Process.run('gnome-screenshot', ['-f', outPath], environment: env);
+          break;
+        case 'spectacle':
+          res = await Process.run('spectacle', ['-b', '-n', '-o', outPath], environment: env);
+          break;
+        case 'import':
+          res = await Process.run('import', ['-window', 'root', outPath], environment: env);
+          break;
+        case 'ffmpeg-x11':
+          final display = env['DISPLAY'] ?? ':0';
+          res = await Process.run('ffmpeg', [
+            '-y', '-loglevel', 'error',
+            '-f', 'x11grab',
+            '-video_size', '1920x1080',
+            '-i', display,
+            '-frames:v', '1',
+            outPath,
+          ], environment: env);
+          break;
+        default:
+          return false;
+      }
+
+      if (res.exitCode != 0) return false;
+      final f = File(outPath);
+      if (!f.existsSync()) return false;
+      final size = f.lengthSync();
+      // Qora rasm 6-10KB bo'ladi 1920x1080'da. Haqiqiy ekran kamida 30KB.
+      if (size < 15000) {
+        await logger.log(LogLevel.warn,
+            '$tool yaratdi lekin juda kichik (${size} bayt) — qora rasm bo\'lishi mumkin',
+            context: 'stream');
+        return false;
+      }
+      return true;
+    } catch (e) {
+      // Komanda topilmadi yoki crash
+      return false;
+    }
   }
 }

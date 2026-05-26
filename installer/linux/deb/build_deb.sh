@@ -79,7 +79,8 @@ Version: ${VERSION}
 Section: net
 Priority: optional
 Architecture: ${ARCH}
-Depends: libgtk-3-0, libsecret-1-0, libayatana-appindicator3-1, scrot | grim | gnome-screenshot | imagemagick
+Depends: libgtk-3-0, libsecret-1-0, libayatana-appindicator3-1, scrot, imagemagick, ffmpeg, gnome-screenshot | spectacle | flameshot | grim | xfce4-screenshooter, libglib2.0-bin, x11-apps
+Recommends: grim, gnome-screenshot, spectacle, xdg-desktop-portal
 Maintainer: E-MMTB <admin@e-mmtb.uz>
 Description: Internet Monitoring Agent
  Authorized education monitoring agent for Linux desktops.
