@@ -128,29 +128,98 @@ class StreamService {
       final tmpDir = await getTemporaryDirectory();
       final path =
           '${tmpDir.path}/ima_stream_${DateTime.now().microsecondsSinceEpoch}.png';
-      final shot = await ScreenCapturer.instance.capture(
-        mode: CaptureMode.screen,
-        imagePath: path,
-        silent: true,
-        copyToClipboard: false,
-      );
-      if (shot == null || shot.imagePath == null) return null;
-      final file = File(shot.imagePath!);
-      if (!file.existsSync()) return null;
+
+      // Linux: bevosita scrot/grim/gnome-screenshot orqali (screen_capturer
+      // paketi Wayland'da va ba'zi distrolarda ishonchsiz). Windows/macOS uchun
+      // screen_capturer ishlatamiz.
+      String? finalPath;
+      if (Platform.isLinux) {
+        finalPath = await _captureLinux(path);
+      } else {
+        final shot = await ScreenCapturer.instance.capture(
+          mode: CaptureMode.screen,
+          imagePath: path,
+          silent: true,
+          copyToClipboard: false,
+        );
+        finalPath = shot?.imagePath;
+      }
+
+      if (finalPath == null) {
+        await logger.log(LogLevel.error,
+            'Screen capture returned null path', context: 'stream');
+        return null;
+      }
+      final file = File(finalPath);
+      if (!file.existsSync()) {
+        await logger.log(LogLevel.error,
+            'Captured file does not exist: $finalPath', context: 'stream');
+        return null;
+      }
       final png = file.readAsBytesSync();
       try {
         file.deleteSync();
       } catch (_) {}
-      // PNG'ni JPEG'ga aylantirish + sifatni pasaytirib trafikni kamaytirish.
-      final decoded = img.decodePng(png);
-      if (decoded == null) return null;
-      // Maksimal kenglik 1280px — 4K monitorlardan kelganda 75% trafik tejaladi.
+
+      if (png.length < 100) {
+        await logger.log(LogLevel.error,
+            'Captured file too small: ${png.length} bytes', context: 'stream');
+        return null;
+      }
+
+      // PNG/JPEG ni decode qilish (scrot ba'zan jpeg ham qaytaradi).
+      final decoded = img.decodeImage(png);
+      if (decoded == null) {
+        await logger.log(LogLevel.error,
+            'Image decode returned null (${png.length} bytes)',
+            context: 'stream');
+        return null;
+      }
       final resized = decoded.width > 1280
           ? img.copyResize(decoded, width: 1280)
           : decoded;
       return Uint8List.fromList(img.encodeJpg(resized, quality: quality));
-    } catch (e) {
+    } catch (e, st) {
+      await logger.log(LogLevel.error,
+          'Screen capture exception: $e\n$st', context: 'stream');
       return null;
     }
+  }
+
+  /// Linux'da bir nechta capture vositasini sinab ko'rish:
+  /// scrot (X11) -> grim (Wayland) -> gnome-screenshot -> import (imagemagick).
+  Future<String?> _captureLinux(String outPath) async {
+    // X11/Wayland session aniqlash.
+    final isWayland = Platform.environment['XDG_SESSION_TYPE'] == 'wayland' ||
+        Platform.environment['WAYLAND_DISPLAY']?.isNotEmpty == true;
+
+    // Tartib: Wayland bo'lsa grim birinchi, X11 bo'lsa scrot birinchi.
+    final attempts = isWayland
+        ? [
+            ['grim', [outPath]],
+            ['gnome-screenshot', ['-f', outPath]],
+            ['scrot', ['-o', outPath]],
+          ]
+        : [
+            ['scrot', ['-o', outPath]],
+            ['import', ['-window', 'root', outPath]],
+            ['gnome-screenshot', ['-f', outPath]],
+            ['grim', [outPath]],
+          ];
+
+    for (final entry in attempts) {
+      final cmd = entry[0] as String;
+      final args = entry[1] as List<String>;
+      try {
+        final res = await Process.run(cmd, args,
+            runInShell: false, environment: Platform.environment);
+        if (res.exitCode == 0 && File(outPath).existsSync()) {
+          return outPath;
+        }
+      } catch (_) {
+        // Komanda topilmadi yoki ishlamadi — keyingisini sinaymiz.
+      }
+    }
+    return null;
   }
 }
