@@ -17,6 +17,7 @@ import '../../features/inventory/data/inventory_repository.dart';
 import '../../features/logs/data/logs_repository.dart';
 import '../../features/processes/data/processes_repository.dart';
 import '../../features/speed_test/data/speed_test_repository.dart';
+import '../../features/stream/data/stream_service.dart';
 
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
   throw UnimplementedError('appDatabaseProvider must be overridden in main()');
@@ -120,6 +121,39 @@ final agentSchedulerProvider = Provider<AgentScheduler>((ref) {
 });
 
 final trayServiceProvider = Provider<TrayService>((ref) => TrayService());
+
+final streamServiceProvider = Provider<StreamService>((ref) {
+  return StreamService(
+    api: ref.watch(apiClientProvider),
+    vault: ref.watch(secureVaultProvider),
+    logger: ref.watch(appLoggerProvider),
+  );
+});
+
+/// Stream sessiyasi haqida UI uchun reaktiv ma'lumot.
+class StreamUiState {
+  const StreamUiState({this.sessionId, this.adminName});
+  final int? sessionId;
+  final String? adminName;
+  bool get isActive => sessionId != null;
+}
+
+class StreamUiNotifier extends StateNotifier<StreamUiState> {
+  StreamUiNotifier() : super(const StreamUiState());
+
+  void start({required int sessionId, required String adminName}) {
+    state = StreamUiState(sessionId: sessionId, adminName: adminName);
+  }
+
+  void stop() {
+    state = const StreamUiState();
+  }
+}
+
+final streamUiProvider =
+    StateNotifierProvider<StreamUiNotifier, StreamUiState>((ref) {
+  return StreamUiNotifier();
+});
 
 class AuthSessionNotifier extends StateNotifier<bool?> {
   AuthSessionNotifier(this._auth) : super(null) {

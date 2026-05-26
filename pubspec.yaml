@@ -34,6 +34,10 @@ dependencies:
   # Windows-only — boshqa platformalarda tushiriladi, lekin pubspec'da har doim ko'rinadi.
   win32: '>=5.4.0 <5.5.5'
   ffi: ^2.1.3
+  # Screen capture (Windows + Linux + macOS) — JPEG ekran rasm olish.
+  screen_capturer: ^0.2.3
+  # PNG -> JPEG konvertatsiya va sifat nazorati.
+  image: ^4.3.0
 
 dev_dependencies:
   flutter_test:

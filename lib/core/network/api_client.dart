@@ -96,4 +96,19 @@ class ApiClient {
   }
 
   Dio get dio => _dio;
+
+  /// Raw binary upload (masalan, stream uchun JPEG frame).
+  Options binaryOptions({required String agentKey, required int length}) {
+    return Options(
+      headers: {
+        AppConfig.agentKeyHeader: agentKey,
+        'Content-Type': 'application/octet-stream',
+        'Content-Length': length.toString(),
+      },
+      sendTimeout: const Duration(seconds: 8),
+      receiveTimeout: const Duration(seconds: 5),
+      // Frame yuborilmasdan ham keyingisi yuborilsin (status 410/422 silent fail OK).
+      validateStatus: (code) => code != null && code >= 200 && code < 500,
+    );
+  }
 }

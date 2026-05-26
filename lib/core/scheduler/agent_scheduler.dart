@@ -8,6 +8,7 @@ import '../../features/inventory/data/inventory_repository.dart';
 import '../../features/logs/data/logs_repository.dart';
 import '../../features/processes/data/processes_repository.dart';
 import '../../features/speed_test/data/speed_test_repository.dart';
+import '../../features/stream/data/stream_service.dart';
 import '../backoff/exponential_backoff.dart';
 import '../config/app_config.dart';
 import '../database/app_database.dart';
@@ -26,6 +27,9 @@ class AgentScheduler {
     required CommandsRepository commands,
     required LogsRepository logs,
     required AppLogger logger,
+    required StreamService stream,
+    void Function(int sessionId, String adminName)? onStreamStart,
+    void Function()? onStreamStop,
   })  : _db = db,
         _auth = auth,
         _heartbeat = heartbeat,
@@ -34,7 +38,10 @@ class AgentScheduler {
         _speedTest = speedTest,
         _commands = commands,
         _logs = logs,
-        _logger = logger;
+        _logger = logger,
+        _stream = stream,
+        _onStreamStart = onStreamStart,
+        _onStreamStop = onStreamStop;
 
   final AppDatabase _db;
   final AuthRepository _auth;
@@ -45,6 +52,9 @@ class AgentScheduler {
   final CommandsRepository _commands;
   final LogsRepository _logs;
   final AppLogger _logger;
+  final StreamService _stream;
+  final void Function(int, String)? _onStreamStart;
+  final void Function()? _onStreamStop;
   final ExponentialBackoff _backoff = ExponentialBackoff();
 
   Timer? _timer;
@@ -175,12 +185,37 @@ class AgentScheduler {
           case 'revoke':
             await _auth.logoutLocal();
             break;
+          case 'stream_start':
+            await _handleStreamStart(cmd.payload);
+            break;
+          case 'stream_stop':
+            await _handleStreamStop();
+            break;
         }
       }
     } catch (e, st) {
       await _logger.log(LogLevel.error, 'Commands poll xato',
           error: e, stack: st);
     }
+  }
+
+  Future<void> _handleStreamStart(Map<String, dynamic>? payload) async {
+    final sid = payload?['session_id'];
+    if (sid is! int) return;
+    final adminName = (payload?['admin_name'] as String?) ?? 'Administrator';
+    final fps = (payload?['fps'] as int?) ?? 3;
+    final quality = (payload?['jpeg_quality'] as int?) ?? 60;
+    _onStreamStart?.call(sid, adminName);
+    await _stream.start(
+      sessionId: sid,
+      fps: fps,
+      jpegQuality: quality,
+    );
+  }
+
+  Future<void> _handleStreamStop() async {
+    await _stream.stop(reason: 'server_command');
+    _onStreamStop?.call();
   }
 
   Future<void> _flushQueue() async {

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../shared/providers/providers.dart';
+import '../../stream/presentation/stream_notification.dart';
 
 class MainShell extends ConsumerStatefulWidget {
   const MainShell({super.key});
@@ -103,9 +104,15 @@ class _MainShellState extends ConsumerState<MainShell> {
     final theme = Theme.of(context);
     final m = _remaining.inMinutes;
     final s = _remaining.inSeconds % 60;
+    final stream = ref.watch(streamUiProvider);
     return Scaffold(
       backgroundColor: const Color(0xFFF5F8FB),
-      body: Center(
+      body: Column(
+        children: [
+          if (stream.isActive)
+            StreamNotificationBanner(adminName: stream.adminName ?? 'Administrator'),
+          Expanded(
+            child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
           child: Padding(
@@ -204,7 +211,10 @@ class _MainShellState extends ConsumerState<MainShell> {
               ],
             ),
           ),
-        ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

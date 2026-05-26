@@ -23,6 +23,7 @@ import 'features/inventory/data/inventory_repository.dart';
 import 'features/logs/data/logs_repository.dart';
 import 'features/processes/data/processes_repository.dart';
 import 'features/speed_test/data/speed_test_repository.dart';
+import 'features/stream/data/stream_service.dart';
 import 'shared/providers/providers.dart';
 
 Future<void> main(List<String> args) async {
@@ -175,6 +176,10 @@ Future<void> main(List<String> args) async {
     identity: identity,
     logger: logger,
   );
+  final streamService = StreamService(api: api, vault: vault, logger: logger);
+  // Notifier singleton — scheduler callback'lari va UI shu instance bilan ishlaydi.
+  final streamUi = StreamUiNotifier();
+
   final scheduler = AgentScheduler(
     db: db,
     auth: authRepo,
@@ -185,6 +190,10 @@ Future<void> main(List<String> args) async {
     commands: commandsRepo,
     logs: logsRepo,
     logger: logger,
+    stream: streamService,
+    onStreamStart: (sid, admin) =>
+        streamUi.start(sessionId: sid, adminName: admin),
+    onStreamStop: () => streamUi.stop(),
   );
 
   await _logStartup('8. Repositories OK, runApp boshlanmoqda...');
@@ -193,6 +202,9 @@ Future<void> main(List<String> args) async {
       overrides: [
         appDatabaseProvider.overrideWithValue(db),
         apiClientProvider.overrideWithValue(api),
+        secureVaultProvider.overrideWithValue(vault),
+        streamServiceProvider.overrideWithValue(streamService),
+        streamUiProvider.overrideWith((ref) => streamUi),
         agentSchedulerProvider.overrideWithValue(scheduler),
       ],
       child: InternetAgentApp(startHidden: startHidden),
