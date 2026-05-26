@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../../shared/providers/providers.dart';
 import '../../stream/presentation/stream_notification.dart';
 
@@ -18,17 +19,28 @@ class _MainShellState extends ConsumerState<MainShell> {
   Timer? _ticker;
   String _status = 'Yuborilmoqda...';
   bool _syncing = false;
+  String _appVersion = '';
 
   @override
   void initState() {
     super.initState();
     // Ticker DARHOL ishga tushadi (syncNow ni kutmasdan).
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _updateRemaining());
+    _loadVersion();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       // Birinchi sync ni fonda yuborish.
       _runSync();
       // Oyna ochiq qoladi — foydalanuvchi o'zi yopadi (X tugmasi treyga yashiradi).
     });
+  }
+
+  Future<void> _loadVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (mounted) {
+        setState(() => _appVersion = '${info.version}+${info.buildNumber}');
+      }
+    } catch (_) {}
   }
 
   Future<void> _runSync() async {
@@ -208,6 +220,24 @@ class _MainShellState extends ConsumerState<MainShell> {
                   icon: const Icon(Icons.refresh_rounded, size: 18),
                   label: const Text('Hozir yuborish'),
                 ),
+                const SizedBox(height: 8),
+                if (_appVersion.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE2E8F0),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      'v$_appVersion',
+                      style: const TextStyle(
+                        color: Color(0xFF475569),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),

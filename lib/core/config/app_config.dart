@@ -24,10 +24,12 @@ class AppConfig {
   static const Duration defaultSpeedTestInterval = Duration(minutes: 10);
   static const Duration defaultInventoryInterval = Duration(hours: 24);
   static const Duration defaultProcessInterval = Duration(minutes: 10);
-  static const Duration defaultCommandsPollInterval = Duration(minutes: 1);
+  // Stream tezda boshlanishi uchun command poll'i tez bo'lishi kerak —
+  // admin Stream tugmasini bosgach, agent 10 sekund ichida bilib oladi.
+  static const Duration defaultCommandsPollInterval = Duration(seconds: 10);
 
-  /// Heartbeat va boshqa joylarda dispatch (15s ichida bir karra tick).
-  static const Duration schedulerTick = Duration(seconds: 15);
+  /// Heartbeat va boshqa joylarda dispatch (5s ichida bir karra tick).
+  static const Duration schedulerTick = Duration(seconds: 5);
 
   static const String appName = 'Internet Monitoring Agent';
   static const String agentKeyHeader = 'X-Agent-Key';
