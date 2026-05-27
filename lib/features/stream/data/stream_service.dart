@@ -31,6 +31,10 @@ class StreamService {
   int _consecutiveFailures = 0;
   int _framesSent = 0;
 
+  // Wayland PipeWire helper jarayoni va u yozadigan frame fayli.
+  Process? _waylandHelper;
+  String? _waylandFramePath;
+
   bool get isStreaming => _activeSessionId != null;
   int? get currentSessionId => _activeSessionId;
 
@@ -52,14 +56,85 @@ class StreamService {
       'Stream boshlandi: session=$sessionId, fps=$fps, quality=$jpegQuality, interval=${intervalMs}ms',
       context: 'stream',
     );
+
+    // Wayland bo'lsa — PipeWire helper'ni ishga tushiramiz (u uzluksiz frame yozadi).
+    if (Platform.isLinux && _isWayland()) {
+      await _startWaylandHelper();
+    }
+
     _ticker = Timer.periodic(Duration(milliseconds: intervalMs), (_) {
       _captureAndSend(jpegQuality);
     });
   }
 
+  bool _isWayland() {
+    final env = Platform.environment;
+    return env['XDG_SESSION_TYPE'] == 'wayland' ||
+        (env['WAYLAND_DISPLAY']?.isNotEmpty ?? false);
+  }
+
+  Future<void> _startWaylandHelper() async {
+    try {
+      final tmp = await getTemporaryDirectory();
+      _waylandFramePath = '${tmp.path}/ima_wayland_frame.jpg';
+      try { File(_waylandFramePath!).deleteSync(); } catch (_) {}
+
+      // Helper /opt/internet-monitoring-agent/wayland_capture.py da bo'ladi (deb),
+      // yoki dev'da loyiha ichida.
+      final candidates = [
+        '/opt/internet-monitoring-agent/wayland_capture.py',
+        '${File(Platform.resolvedExecutable).parent.path}/wayland_capture.py',
+        '${File(Platform.resolvedExecutable).parent.path}/data/flutter_assets/wayland_capture.py',
+      ];
+      String? helperPath;
+      for (final c in candidates) {
+        if (File(c).existsSync()) {
+          helperPath = c;
+          break;
+        }
+      }
+      if (helperPath == null) {
+        await logger.log(LogLevel.error,
+            'Wayland helper topilmadi: ${candidates.join(", ")}', context: 'stream');
+        return;
+      }
+
+      final home = Platform.environment['HOME'] ?? '/tmp';
+      final tokenFile = '$home/.local/share/internet-monitoring-agent/screencast_token';
+
+      await logger.log(LogLevel.info,
+          'Wayland PipeWire helper ishga tushmoqda: $helperPath '
+          '(birinchi marta "Allow" tugmasi chiqishi mumkin)',
+          context: 'stream');
+
+      _waylandHelper = await Process.start(
+        'python3',
+        [helperPath, _waylandFramePath!, tokenFile],
+        environment: Platform.environment,
+        mode: ProcessStartMode.normal,
+      );
+      // Helper stderr'ni log'ga yozamiz (debug uchun).
+      _waylandHelper!.stderr.transform(const SystemEncoding().decoder).listen((line) {
+        final t = line.trim();
+        if (t.isNotEmpty) {
+          logger.log(LogLevel.info, 'PipeWire helper: $t', context: 'stream');
+        }
+      });
+    } catch (e, st) {
+      await logger.log(LogLevel.error,
+          'Wayland helper start xatosi: $e\n$st', context: 'stream');
+    }
+  }
+
   Future<void> stop({String reason = 'manual'}) async {
     _ticker?.cancel();
     _ticker = null;
+    // Wayland helper'ni to'xtatish.
+    try {
+      _waylandHelper?.kill(ProcessSignal.sigterm);
+    } catch (_) {}
+    _waylandHelper = null;
+    _waylandFramePath = null;
     final id = _activeSessionId;
     _activeSessionId = null;
     if (id != null) {
@@ -148,6 +223,19 @@ class StreamService {
   }
 
   Future<Uint8List?> _grabJpeg(int quality) async {
+    // Wayland: PipeWire helper uzluksiz JPEG yozadi — shuni o'qiymiz.
+    if (Platform.isLinux && _isWayland() && _waylandFramePath != null) {
+      try {
+        final f = File(_waylandFramePath!);
+        if (f.existsSync() && f.lengthSync() > 2000) {
+          return f.readAsBytesSync();
+        }
+        // Hali frame yo'q (helper "Allow" kutyapti yoki ishga tushmoqda)
+        return null;
+      } catch (_) {
+        return null;
+      }
+    }
     try {
       final tmpDir = await getTemporaryDirectory();
       final path =

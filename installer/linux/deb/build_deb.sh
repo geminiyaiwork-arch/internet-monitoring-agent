@@ -40,6 +40,11 @@ cp -r "$BUILD_OUT"/* "$DEB_ROOT/opt/internet-monitoring-agent/"
 cp "$ROOT/installer/linux/systemd/internet-agent.service" \
    "$DEB_ROOT/usr/lib/systemd/user/internet-agent.service"
 
+# Wayland screen-capture helper (PipeWire portal)
+cp "$ROOT/installer/linux/helper/wayland_capture.py" \
+   "$DEB_ROOT/opt/internet-monitoring-agent/wayland_capture.py"
+chmod 0755 "$DEB_ROOT/opt/internet-monitoring-agent/wayland_capture.py"
+
 # .desktop fayl (menyu uchun)
 cat > "$DEB_ROOT/usr/share/applications/internet-monitoring-agent.desktop" <<EOF
 [Desktop Entry]
@@ -79,8 +84,8 @@ Version: ${VERSION}
 Section: net
 Priority: optional
 Architecture: ${ARCH}
-Depends: libgtk-3-0, libsecret-1-0, libayatana-appindicator3-1, scrot, imagemagick, ffmpeg, gnome-screenshot | spectacle | flameshot | grim | xfce4-screenshooter, libglib2.0-bin, x11-apps
-Recommends: grim, gnome-screenshot, spectacle, xdg-desktop-portal
+Depends: libgtk-3-0, libsecret-1-0, libayatana-appindicator3-1, scrot, imagemagick, ffmpeg, libglib2.0-bin, x11-apps, python3, python3-gi, python3-dbus, gstreamer1.0-pipewire, gstreamer1.0-plugins-good, gir1.2-gst-1.0
+Recommends: grim, gnome-screenshot, spectacle, xdg-desktop-portal, xdg-desktop-portal-gnome | xdg-desktop-portal-kde | xdg-desktop-portal-wlr
 Maintainer: E-MMTB <admin@e-mmtb.uz>
 Description: Internet Monitoring Agent
  Authorized education monitoring agent for Linux desktops.
@@ -88,82 +93,15 @@ Description: Internet Monitoring Agent
  snapshot for the central admin panel.
 EOF
 
-# postinst — agentni user-mode systemd'ga yozish + Wayland'ni o'chirish
-# (screen monitoring uchun X11 kerak, Wayland xavfsizlik chegaralari sababli)
+# postinst — agentni o'rnatish.
+# DIQQAT: display manager sozlamalariga TEGMAYMIZ (Wayland o'chirish ba'zi
+# NVIDIA/Optimus laptoplarda qora ekranga olib keladi). Wayland'da screen
+# capture PipeWire portal orqali amalga oshadi (wayland_capture.py).
 cat > "$DEB_ROOT/DEBIAN/postinst" <<'EOF'
 #!/bin/bash
 set -e
 chmod +x /opt/internet-monitoring-agent/internet || true
-
-# === X11 majburiy: barcha display manager'larda Wayland'ni o'chirish ===
-# Screen capture (scrot, ffmpeg, import) Wayland'da ishlamaydi.
-# Bu o'zgartirish keyingi login'dan keyin kuchga kiradi.
-
-WAYLAND_DISABLED=0
-
-# GDM3 (Ubuntu, Debian, Kali)
-if [ -f /etc/gdm3/daemon.conf ]; then
-    if grep -q "^WaylandEnable=" /etc/gdm3/daemon.conf; then
-        sed -i 's/^WaylandEnable=.*/WaylandEnable=false/' /etc/gdm3/daemon.conf
-    elif grep -q "^#WaylandEnable=" /etc/gdm3/daemon.conf; then
-        sed -i 's/^#WaylandEnable=.*/WaylandEnable=false/' /etc/gdm3/daemon.conf
-    else
-        # [daemon] sectioniga qo'shish
-        if grep -q "^\[daemon\]" /etc/gdm3/daemon.conf; then
-            sed -i '/^\[daemon\]/a WaylandEnable=false' /etc/gdm3/daemon.conf
-        else
-            echo -e "[daemon]\nWaylandEnable=false" >> /etc/gdm3/daemon.conf
-        fi
-    fi
-    WAYLAND_DISABLED=1
-    echo "[IMA] GDM3 sozlandi: WaylandEnable=false"
-fi
-
-# GDM (Fedora, RHEL, CentOS)
-if [ -f /etc/gdm/custom.conf ]; then
-    if grep -q "^WaylandEnable=" /etc/gdm/custom.conf; then
-        sed -i 's/^WaylandEnable=.*/WaylandEnable=false/' /etc/gdm/custom.conf
-    elif grep -q "^#WaylandEnable=" /etc/gdm/custom.conf; then
-        sed -i 's/^#WaylandEnable=.*/WaylandEnable=false/' /etc/gdm/custom.conf
-    else
-        if grep -q "^\[daemon\]" /etc/gdm/custom.conf; then
-            sed -i '/^\[daemon\]/a WaylandEnable=false' /etc/gdm/custom.conf
-        else
-            echo -e "[daemon]\nWaylandEnable=false" >> /etc/gdm/custom.conf
-        fi
-    fi
-    WAYLAND_DISABLED=1
-    echo "[IMA] GDM sozlandi: WaylandEnable=false"
-fi
-
-# SDDM (KDE Plasma)
-if [ -d /etc/sddm.conf.d ] || [ -f /etc/sddm.conf ]; then
-    mkdir -p /etc/sddm.conf.d
-    cat > /etc/sddm.conf.d/10-internet-agent-x11.conf <<SDDM
-[General]
-DisplayServer=x11
-SDDM
-    WAYLAND_DISABLED=1
-    echo "[IMA] SDDM sozlandi: DisplayServer=x11"
-fi
-
-# LightDM (XFCE, MATE) — odatda X11 default, lekin ehtiyot uchun
-if [ -d /etc/lightdm/lightdm.conf.d ]; then
-    cat > /etc/lightdm/lightdm.conf.d/10-internet-agent-x11.conf <<LDM
-[Seat:*]
-greeter-session=lightdm-gtk-greeter
-LDM
-fi
-
-if [ "$WAYLAND_DISABLED" = "1" ]; then
-    echo "[IMA] ============================================"
-    echo "[IMA] Screen monitoring uchun X11 yoqildi."
-    echo "[IMA] Foydalanuvchi keyingi LOGIN'da X11'da kiradi."
-    echo "[IMA] Joriy sessiya hali Wayland'da bo'lishi mumkin."
-    echo "[IMA] ============================================"
-fi
-
-# Foydalanuvchi qo'lda yoqishi mumkin: systemctl --user enable --now internet-agent.service
+chmod +x /opt/internet-monitoring-agent/wayland_capture.py 2>/dev/null || true
 exit 0
 EOF
 chmod 0755 "$DEB_ROOT/DEBIAN/postinst"

@@ -8,7 +8,7 @@
 ; Natija: build/installer/InternetMonitoringAgent_Setup_<ver>.exe
 
 #define MyAppName "Internet Monitoring Agent"
-#define MyAppVersion "1.1.6"
+#define MyAppVersion "1.1.7"
 #define MyAppPublisher "E-MMTB"
 #define MyAppExeName "internet.exe"
 #define BuildOutput "..\\..\\build\\windows\\x64\\runner\\Release"
